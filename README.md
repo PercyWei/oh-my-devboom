@@ -13,6 +13,7 @@
 | Zsh Augmented | Antidote 插件管理器，以及 zsh-completions（补全）、zsh-autosuggestions（输入建议）、zsh-syntax-highlighting（语法高亮） | `zsh` |
 | Prompt | Powerlevel10k、gitstatusd Git 状态辅助程序及个人主题预设 | `powerlevel10k` |
 | 配置部署 | Zsh 启动配置、插件列表、Git 通用配置和 Powerlevel10k 预设，通过软链接部署 | `dotfiles` |
+| 默认 Shell | 将当前执行账户的登录 Shell 设为 Zsh | `shell` |
 
 以下开发工具默认启用，可在配置中逐项关闭，或用 `--tools` 指定：
 
@@ -81,6 +82,8 @@ bash bootstrap.sh --non-interactive --modules tools --tools jq,fd
 
 默认启用全部模块，工具条目也全部选中，请按需关闭不需要的内容。
 
+`[modules]` 中的 `shell=true` 启用默认登录 Shell 设置，改为 `false` 可关闭。已有个人配置需要加入此项才会启用，也可用 `--modules shell` 单独执行。
+
 例如，安装基础工具、fzf、jq、fd 并部署配置：
 
 ```ini
@@ -124,7 +127,7 @@ tests/run.sh              # 基础测试
 
 ## 模块与参数
 
-执行顺序固定：Linux 为 `base → homebrew → zsh → powerlevel10k → tools → dotfiles`；macOS 交换前两个模块的顺序。仅执行选中的模块。
+执行顺序固定：Linux 为 `base → homebrew → zsh → powerlevel10k → tools → dotfiles → shell`；macOS 交换前两个模块的顺序。仅执行选中的模块。
 
 | 参数 | 说明 |
 | --- | --- |
@@ -171,17 +174,21 @@ xcode-select --install
 
 ```bash
 bash bootstrap.sh --non-interactive --allow-remote \
-  --modules base,zsh,powerlevel10k,tools,dotfiles
+  --modules base,zsh,powerlevel10k,tools,dotfiles,shell
 exec zsh
 ```
 
 已有 `.zshrc` 默认保留，需要替换时使用 `--conflict backup`。仓库应放在持久化目录中；容器重建后，系统包和未持久化的工具、插件、缓存需重新安装。
 
-确认安装摘要无失败后，运行 `exec zsh` 切换当前 Shell。若要修改后续登录的默认 Shell，再运行：
+`shell` 模块通过 `chsh` 修改当前执行账户，已使用 Zsh 时跳过。请以目标账户运行；通过 `sudo bash bootstrap.sh` 执行时，修改的是 root 账户。模块选用 `/etc/shells` 中已登记且可执行的 Zsh；缺少有效路径或 `chsh` 时会提示跳过。
+
+普通用户交互执行时，系统可能要求账户密码；非交互执行需要 root 或免密 sudo，否则跳过。更改后重新登录生效，当前终端使用：
 
 ```bash
-chsh -s "$(command -v zsh)"
+exec zsh
 ```
+
+容器平台或终端若固定以 `bash` 启动，仍需将其启动命令设为 `zsh`；登录 Shell 设置不会覆盖显式启动命令。
 
 ## 程序配置部署
 
@@ -273,7 +280,7 @@ bash tests/run.sh
 git ls-files -z '*.sh' | xargs -0 -n 1 bash -n
 ```
 
-覆盖系统检测、配置与参数解析、幂等性、配置部署、Shell 初始化、GitHub 加速及下载失败处理。Shell 集成检查需要 Zsh，缺失时跳过；CI 在 Ubuntu 和 macOS 上运行这些检查。
+覆盖系统检测、配置与参数解析、幂等性、配置部署、默认登录 Shell 设置、Shell 初始化、GitHub 加速及下载失败处理。Shell 集成检查需要 Zsh，缺失时跳过；CI 在 Ubuntu 和 macOS 上运行这些检查。
 
 实机复测需检查 `z`、`zi`、fzf 快捷键和 Powerlevel10k Git 状态；NVTOP 的 GPU 数据展示需在具备设备访问权限的环境验证。
 

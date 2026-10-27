@@ -15,7 +15,7 @@ Usage: ./bootstrap.sh [options]
 Set up a personal development environment on Linux or macOS (Bash 3.2+).
 
   --config FILE     Installation settings (default: config/default.conf)
-  --modules LIST    Override modules: base,homebrew,zsh,powerlevel10k,tools,dotfiles
+  --modules LIST    Override modules: base,homebrew,zsh,powerlevel10k,tools,dotfiles,shell
                     Comma-separated names, or all.
   --tools LIST      Override tools: uv,fzf,rg,bat,eza,zoxide,zellij,nvtop,jq,fd
                     Comma-separated names, or all. Requires the tools module.
@@ -48,6 +48,7 @@ zsh        Zsh Augmented: Antidote, completions, suggestions and highlighting
 powerlevel10k Install the Powerlevel10k Zsh prompt
 tools      Install selected optional developer tools
 dotfiles   Link Zsh, Git, Powerlevel10k and plugin configuration
+shell      Set the current account's login shell to Zsh
 EOF
 }
 
@@ -118,6 +119,7 @@ print_install_plan() {
             powerlevel10k) printf '  powerlevel10k: Powerlevel10k、gitstatusd\n' ;;
             tools) printf '  tools: %s\n' "${TOOLS:-未选择工具}" ;;
             dotfiles) printf '  dotfiles: 部署 Shell / Git / 主题配置及插件列表\n' ;;
+            shell) printf '  shell: 将当前执行账户的默认登录 Shell 设为 Zsh（chsh）\n' ;;
         esac
     done
     case " $MODULES " in *' tools '*) ;; *) log_info '可选开发工具：未启用 tools 模块。' ;; esac
@@ -179,7 +181,7 @@ print_install_summary() {
         [[ "${RESULT_LABELS[$item]}" != "$HOME/.gitconfig" ]] || git_config_ready=1
     done
     if [[ "$zsh_config_ready" == 1 ]] && have zsh; then
-        printf '\n下一步：运行 zsh 检查启动配置；配置软链接依赖当前仓库目录，请保留该目录。\n'
+        printf '\n下一步：运行 exec zsh 使用当前配置；配置软链接依赖当前仓库目录，请保留该目录。\n'
     fi
     if [[ "$git_config_ready" == 1 ]] && have git; then
         local git_name='' git_email=''
@@ -229,8 +231,8 @@ main() {
     case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
     detect_system || return 1
     local module answer result failed=0 total=0 started module_started first item successful pending errors state elapsed
-    local execution_order='base homebrew zsh powerlevel10k tools dotfiles'
-    if [ "$OS" = macos ]; then execution_order='homebrew base zsh powerlevel10k tools dotfiles'; fi
+    local execution_order='base homebrew zsh powerlevel10k tools dotfiles shell'
+    if [ "$OS" = macos ]; then execution_order='homebrew base zsh powerlevel10k tools dotfiles shell'; fi
     printf '\n'
     print_styled '1;36' 'oh-my-devboom'
     printf '\n开发环境初始化\n\n环境    %s / %s / %s · uid=%s · 包管理器=%s · 容器=%s\n' \

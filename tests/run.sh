@@ -16,7 +16,7 @@ assert_equal() {
 
 if [[ $# -eq 0 ]]; then
     failures=0
-    for test_case in detection arguments config idempotency packages remote fzf shell; do
+    for test_case in detection arguments config idempotency packages remote fzf shell shell_login; do
         if "$BASH_BIN" "$0" "$test_case"; then
             printf 'PASS: %s\n' "$test_case"
         else
@@ -99,18 +99,20 @@ RELEASE
         output=$("$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --help)
         [[ "$output" == *--config* && "$output" == *--modules* && "$output" == *--allow-remote* ]] || fail 'Help documents config, module and remote options'
         output=$("$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --list-modules)
-        for module in base homebrew zsh powerlevel10k tools dotfiles; do
+        for module in base homebrew zsh powerlevel10k tools dotfiles shell; do
             [[ "$output" == *"$module"* ]] || fail "Missing module in list: $module"
         done
         [[ "$output" != *starship* ]] || fail 'Removed Starship module is still listed'
         source "$REPO_ROOT/bootstrap.sh"
         parse_args --non-interactive
-        assert_equal 'base homebrew zsh powerlevel10k tools dotfiles' "$MODULES" 'Default config enables all listed modules'
+        assert_equal 'base homebrew zsh powerlevel10k tools dotfiles shell' "$MODULES" 'Default config enables all listed modules, including login shell setup'
         assert_equal 'fzf rg bat eza zoxide nvtop jq fd uv zellij' "$TOOLS" 'Default tools follow the grouped config order'
         assert_equal 'https://ghfast.top/' "$GITHUB_PROXY" 'Default config selects the GitHub download prefix'
         assert_equal 600 "$GIT_TIMEOUT" 'Default Git download timeout is ten minutes'
         parse_args --modules powerlevel10k --non-interactive
         assert_equal powerlevel10k "$MODULES" 'Powerlevel10k module is accepted'
+        parse_args --modules shell --non-interactive
+        assert_equal shell "$MODULES" 'Login shell setup can be selected independently'
         parse_args --modules tools --tools zellij,nvtop,jq,fd --non-interactive
         assert_equal 'zellij nvtop jq fd' "$TOOLS" 'Zellij, nvtop, jq and fd are accepted tools'
         parse_args --modules all --tools all --non-interactive
@@ -201,7 +203,9 @@ RELEASE
         fi
         [[ ! -e "$HOME/.zshrc" && ! -e "$HOME/.gitconfig" ]] || fail 'Argument checks changed HOME'
 
-        printf '[modules]\ndotfiles=true\n[tools]\njq=true\n' > "$config_file"
+        printf '[modules]\ndotfiles=true\nshell=false\n[tools]\njq=true\n' > "$config_file"
+        parse_args --config "$config_file" --non-interactive
+        assert_equal dotfiles "$MODULES" 'shell=false disables login shell changes'
         output=$("$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --config "$config_file" --non-interactive)
         [[ -L "$HOME/.zshrc" && -L "$HOME/.gitconfig" ]] || fail 'Custom config did not deploy selected dotfiles'
         [[ "$output" == *'  dotfiles:'* && "$output" == *'未启用 tools 模块'* && "$output" != *'  tools:'* ]] || fail 'Plan presents disabled optional tools as installation targets'
@@ -707,6 +711,114 @@ ZSH
                 [[ ! -s "$TEST_ROOT/shell.log" ]] || { cat "$TEST_ROOT/shell.log" >&2; fail 'Unexpected shell startup output'; }
             fi
         done
+        ;;
+    shell_login)
+        source "$REPO_ROOT/lib/common.sh"
+        source "$REPO_ROOT/lib/packages.sh"
+        source "$REPO_ROOT/modules/shell.sh"
+        target="$TEST_ROOT/bin/zsh"
+        account_file="$TEST_ROOT/account-shell"
+        SHELLS_FILE="$TEST_ROOT/shells"
+        # Even a command-prefixed invocation must never reach the host's chsh/sudo.
+        for tool in zsh chsh sudo; do
+            printf '#!/bin/sh\nexit 99\n' > "$TEST_ROOT/bin/$tool"
+            chmod +x "$TEST_ROOT/bin/$tool"
+        done
+        printf '# Registered shells\n/bin/bash\n%s\n' "$target" > "$SHELLS_FILE"
+        : > "$TEST_ROOT/chsh.log"
+        : > "$TEST_ROOT/sudo.log"
+        id() {
+            case "$1" in
+                -u) printf '%s\n' "$USER_ID" ;;
+                -un) printf 'fixture\n' ;;
+                *) fail "Unexpected id invocation: $*" ;;
+            esac
+        }
+        getent() {
+            [[ "$OS" == linux ]] || fail 'macOS queried the Linux account database'
+            assert_equal "passwd $USER_ID" "$*" 'Linux queries the current UID'
+            printf 'fixture:x:%s:123:Fixture:%s:%s\n' "$USER_ID" "$HOME" "$(cat "$account_file")"
+        }
+        dscl() {
+            assert_equal '. -read /Users/fixture UserShell' "$*" 'macOS reads the current account UserShell'
+            printf 'UserShell: %s\n' "$(cat "$account_file")"
+        }
+        chsh() {
+            assert_equal "-s $target fixture" "$*" 'chsh targets the registered shell and current account'
+            printf '%s\n' "$*" >> "$TEST_ROOT/chsh.log"
+            case "$chsh_mode" in
+                fail) return 7 ;;
+                no_change) return 0 ;;
+                *) printf '%s\n' "$2" > "$account_file" ;;
+            esac
+        }
+        sudo() {
+            printf '%s\n' "$*" >> "$TEST_ROOT/sudo.log"
+            [[ "$1" == -n ]] || fail 'Non-interactive shell changes invoked interactive sudo'
+            shift
+            if [[ "$*" == true ]]; then return "$sudo_status"; fi
+            [[ "$1" == chsh ]] || fail "Unexpected sudo command: $*"
+            "$@"
+        }
+        OS=linux
+        USER_ID=0
+        HAS_SUDO=0
+        INTERACTIVE=0
+        chsh_mode=change
+        sudo_status=0
+        printf '%s\n' "$target" > "$account_file"
+        printf '/bin/bash\n' > "$SHELLS_FILE"
+        module_shell
+        [[ ! -s "$TEST_ROOT/chsh.log" ]] || fail 'An existing Zsh login shell was changed'
+        printf '%s\n' "$target" > "$SHELLS_FILE"
+
+        for scenario in root interactive sudo; do
+            USER_ID=4242 HAS_SUDO=0 INTERACTIVE=0
+            case "$scenario" in
+                root) USER_ID=0 ;;
+                interactive) INTERACTIVE=1 ;;
+                sudo) HAS_SUDO=1 ;;
+            esac
+            printf '/bin/bash\n' > "$account_file"
+            : > "$TEST_ROOT/chsh.log"
+            : > "$TEST_ROOT/sudo.log"
+            module_shell
+            assert_equal "$target" "$(cat "$account_file")" "$scenario updates the fixture login shell"
+            assert_equal "-s $target fixture" "$(cat "$TEST_ROOT/chsh.log")" "$scenario changes the account exactly once"
+            if [[ "$scenario" == sudo ]]; then
+                assert_equal "$(printf '%s\n' '-n true' "-n chsh -s $target fixture")" "$(cat "$TEST_ROOT/sudo.log")" 'Non-interactive sudo is probed and invoked with -n'
+            else
+                [[ ! -s "$TEST_ROOT/sudo.log" ]] || fail "$scenario unnecessarily invoked sudo"
+            fi
+        done
+        module_shell
+        assert_equal "-s $target fixture" "$(cat "$TEST_ROOT/chsh.log")" 'Repeated shell setup does not run chsh again'
+
+        printf '/bin/bash\n' > "$account_file"
+        : > "$TEST_ROOT/chsh.log"
+        sudo_status=1
+        for HAS_SUDO in 0 1; do
+            status=0
+            module_shell || status=$?
+            assert_equal 2 "$status" 'Missing non-interactive privilege reports a skip'
+        done
+        [[ ! -s "$TEST_ROOT/chsh.log" ]] || fail 'Unavailable sudo still invoked chsh'
+        USER_ID=0
+        printf '/bin/bash\n' > "$SHELLS_FILE"
+        status=0
+        module_shell || status=$?
+        assert_equal 2 "$status" 'No registered executable Zsh reports a skip'
+        [[ ! -s "$TEST_ROOT/chsh.log" ]] || fail 'An unregistered shell reached chsh'
+        printf '%s\n' "$target" > "$SHELLS_FILE"
+        for chsh_mode in fail no_change; do
+            status=0
+            module_shell || status=$?
+            assert_equal 1 "$status" 'chsh failure or an unchanged account reports failure'
+            assert_equal /bin/bash "$(cat "$account_file")" 'Failed shell setup preserves the original fixture shell'
+        done
+        OS=macos USER_ID=501 INTERACTIVE=1 HAS_SUDO=0 chsh_mode=change
+        module_shell
+        assert_equal "$target" "$(cat "$account_file")" 'macOS reads and confirms the shell through dscl'
         ;;
     *) fail "Unknown test case: $1" ;;
 esac

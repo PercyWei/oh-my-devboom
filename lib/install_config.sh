@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-AVAILABLE_MODULES='base homebrew zsh powerlevel10k tools dotfiles'
+AVAILABLE_MODULES='base homebrew zsh powerlevel10k tools dotfiles shell'
 AVAILABLE_TOOLS='uv fzf rg bat eza zoxide zellij nvtop jq fd'
 
 load_install_config() {

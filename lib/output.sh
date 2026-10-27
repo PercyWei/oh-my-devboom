@@ -18,6 +18,7 @@ module_label() {
         powerlevel10k) printf 'Powerlevel10k' ;;
         tools) printf '开发工具' ;;
         dotfiles) printf '配置部署' ;;
+        shell) printf '默认 Shell' ;;
     esac
 }
 
