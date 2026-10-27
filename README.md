@@ -56,7 +56,7 @@ config_file = /root/clash.yaml
 
 安装前会显示环境、模块、工具及安装策略，确认后执行；未授权的上游下载会逐项询问。执行中显示模块编号、名称与耗时；配置和命令行使用 `zsh` 表示 Zsh Augmented 模块。
 
-结束摘要逐模块列出已安装、已就绪、已部署、已备份、跳过和失败的组件，包含实际路径、未完成原因和处理建议。模块整体分为完成、部分完成、跳过和失败；已有组件复用计入完成。需要重试时会提供保留本次安装选项的命令，并按实际配置部署结果提示 Shell 启动与 Git 身份设置。
+安装结束后以独立分隔区显示结果，每个模块仅保留整体状态和耗时；已有组件复用计入完成。摘要只展开跳过和失败的原因、处理建议，并单列配置备份。前置步骤失败时会列出未执行模块。需要重试时会提供保留本次安装选项的命令，并按实际结果提示 Shell 启动、重新登录与 Git 身份设置。组件安装和部署的完整路径留在执行过程记录中。
 
 终端支持时使用彩色状态标签，设置 `NO_COLOR=1` 或 `TERM=dumb` 可关闭颜色；重定向的输出使用普通文本。包管理器和上游安装器保留自身输出与输入提示。组件状态和最终摘要写入 stderr，保存完整记录时同时重定向两个输出流，例如 `bash bootstrap.sh --config config/local.conf --non-interactive > install.log 2>&1`。
 
@@ -263,7 +263,13 @@ Powerlevel10k 需要 Zsh 5.1+，安装在 `${XDG_DATA_HOME:-$HOME/.local/share}/
 - 已有软链接指向普通文件：转换为保留当前内容的普通文件，本次不替换为仓库预设，不受 `skip/backup` 影响。
 - 其他冲突（文件内容不同、目录、悬空链接或目录链接）：默认 `skip`，保留原内容；使用 `--conflict backup` 时，先备份再复制，日志显示带时间戳的备份路径。
 
-绕过 Clash，仅重新部署配置：
+保留当前配置，将已有文件软链接转换为普通文件（在仓库目录执行）：
+
+```bash
+bash bootstrap.sh --non-interactive --modules dotfiles --conflict skip
+```
+
+备份冲突文件后部署仓库预设：
 
 ```bash
 bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup

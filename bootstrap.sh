@@ -155,7 +155,10 @@ print_install_plan() {
 print_install_summary() {
     local elapsed=$1 index item state completed=0 partial=0 skipped=0 failures=0
     local retry_modules='' zsh_config_ready=0 git_config_ready=0 clash_failed=0
+    local module executed_modules='' not_run='' issues=0 backups=0 shown_actions action
+    local shell_changed=0 clash_note='' clash_last_state=''
     for ((index=0; index<MODULE_COUNT; index++)); do
+        executed_modules="${executed_modules:+$executed_modules }${MODULE_IDS[$index]}"
         case "${MODULE_STATES[$index]}" in
             complete) completed=$((completed + 1)) ;;
             partial) partial=$((partial + 1)) ;;
@@ -163,35 +166,88 @@ print_install_summary() {
             failed) failures=$((failures + 1)) ;;
         esac
     done
+    for module in $MODULES; do
+        case " $executed_modules " in *" $module "*) continue ;; esac
+        not_run="${not_run:+${not_run}、}$(module_label "$module")"
+    done
+    for ((item=0; item<RESULT_COUNT; item++)); do
+        if [[ "${RESULT_MODULES[$item]}" == clash ]]; then
+            clash_last_state=${RESULT_STATES[$item]}
+            clash_note=${RESULT_DETAILS[$item]}
+        fi
+        case "${RESULT_STATES[$item]}" in
+            skipped|failed) issues=$((issues + 1)) ;;
+            backup) backups=$((backups + 1)) ;;
+            ready|configured)
+                [[ "${RESULT_LABELS[$item]}" != "${ZDOTDIR:-$HOME}/.zshrc" ]] || zsh_config_ready=1
+                [[ "${RESULT_LABELS[$item]}" != "$HOME/.gitconfig" ]] || git_config_ready=1
+                if [[ "${RESULT_STATES[$item]}" == configured ]]; then
+                    [[ "${RESULT_MODULES[$item]}" != shell ]] || shell_changed=1
+                fi
+                ;;
+        esac
+    done
+    printf '\n\n'
+    print_styled '1;36' '========================================================'
     printf '\n'
-    print_styled '1' "执行结果 · 总耗时 ${elapsed}s"
-    printf '\n完成 %s · 部分完成 %s · 跳过 %s · 失败 %s\n' "$completed" "$partial" "$skipped" "$failures"
+    print_styled '1;36' "  安装结果 · 总耗时 ${elapsed}s"
+    printf '\n'
+    print_styled '1;36' '========================================================'
+    printf '\n完成 %s · 部分完成 %s · 跳过 %s · 失败 %s\n\n' "$completed" "$partial" "$skipped" "$failures"
     for ((index=0; index<MODULE_COUNT; index++)); do
-        printf '\n'
         state=${MODULE_STATES[$index]}
+        printf '  '
         print_status "$state"
-        printf ' %s (%s) · %ss\n' "$(module_label "${MODULE_IDS[$index]}")" "${MODULE_IDS[$index]}" "${MODULE_TIMES[$index]}"
-        for ((item=0; item<RESULT_COUNT; item++)); do
-            [[ "${RESULT_MODULES[$item]}" == "${MODULE_IDS[$index]}" ]] || continue
-            printf '  '
-            print_status "${RESULT_STATES[$item]}"
-            printf ' %s：%s\n' "${RESULT_LABELS[$item]}" "${RESULT_DETAILS[$item]}"
-            if [[ -n "${RESULT_ACTIONS[$item]}" ]]; then
-                printf '    建议：%s\n' "${RESULT_ACTIONS[$item]}"
-            fi
-        done
+        printf ' %s · %ss\n' "$(module_label "${MODULE_IDS[$index]}")" "${MODULE_TIMES[$index]}"
         case "$state" in
             partial|failed) retry_modules="${retry_modules:+$retry_modules,}${MODULE_IDS[$index]}" ;;
         esac
         if [[ "${MODULE_IDS[$index]}" == clash && "$state" == failed ]]; then clash_failed=1; fi
     done
-    for ((item=0; item<RESULT_COUNT; item++)); do
-        case "${RESULT_STATES[$item]}" in ready|configured) ;; *) continue ;; esac
-        [[ "${RESULT_LABELS[$item]}" != "${ZDOTDIR:-$HOME}/.zshrc" ]] || zsh_config_ready=1
-        [[ "${RESULT_LABELS[$item]}" != "$HOME/.gitconfig" ]] || git_config_ready=1
-    done
+    if [[ -n "$not_run" ]]; then
+        printf '\n'
+        print_styled '33' "未执行：$not_run"
+        printf '\n'
+    fi
+    if [[ "$issues" != 0 ]]; then
+        printf '\n'
+        print_styled '1' '需关注'
+        printf '\n'
+        for ((index=0; index<MODULE_COUNT; index++)); do
+            shown_actions=$'\n'
+            for ((item=0; item<RESULT_COUNT; item++)); do
+                [[ "${RESULT_MODULES[$item]}" == "${MODULE_IDS[$index]}" ]] || continue
+                case "${RESULT_STATES[$item]}" in skipped|failed) ;; *) continue ;; esac
+                printf '  '
+                print_status "${RESULT_STATES[$item]}"
+                printf ' %s / %s：%s\n' "$(module_label "${MODULE_IDS[$index]}")" "${RESULT_LABELS[$item]}" "${RESULT_DETAILS[$item]}"
+                action=${RESULT_ACTIONS[$item]}
+                if [[ -n "$action" ]]; then
+                    case "$shown_actions" in
+                        *$'\n'"$action"$'\n'*) ;;
+                        *) printf '    建议：%s\n' "$action"; shown_actions="$shown_actions$action"$'\n' ;;
+                    esac
+                fi
+            done
+        done
+    fi
+    if [[ "$backups" != 0 ]]; then
+        printf '\n'
+        print_styled '1' '配置备份'
+        printf '\n'
+        for ((item=0; item<RESULT_COUNT; item++)); do
+            [[ "${RESULT_STATES[$item]}" == backup ]] || continue
+            printf '  %s：%s\n' "${RESULT_LABELS[$item]}" "${RESULT_DETAILS[$item]}"
+        done
+    fi
+    if [[ "$clash_last_state" == configured ]]; then
+        printf '\nClash：%s\n' "$clash_note"
+    fi
+    if [[ "$shell_changed" == 1 ]]; then
+        printf '\n默认登录 Shell 已更新，重新登录后生效。\n'
+    fi
     if [[ "$zsh_config_ready" == 1 ]] && have zsh; then
-        printf '\n下一步：运行 exec zsh 使用当前配置；已成功部署的配置为独立文件，可直接编辑，不依赖仓库目录。\n'
+        printf '\n下一步：运行 exec zsh 使用当前配置。\n'
     fi
     if [[ "$git_config_ready" == 1 ]] && have git; then
         local git_name='' git_email=''
@@ -223,11 +279,11 @@ print_install_summary() {
     fi
     printf '\n'
     if [[ "$failures" != 0 ]]; then
-        print_styled '31' '存在安装错误，退出码 1；其他模块的已完成结果保留。'
+        print_styled '31' '安装存在错误（退出码 1）。'
     elif [[ "$partial" != 0 || "$skipped" != 0 ]]; then
-        print_styled '33' '本次无安装错误，退出码 0；仍有跳过或未完成项，请查看上述原因。'
+        print_styled '33' '本次无安装错误；请查看未完成项（退出码 0）。'
     else
-        print_styled '32' '所选模块均已完成，退出码 0。'
+        print_styled '32' '安装完成（退出码 0）。'
     fi
     printf '\n'
 }
