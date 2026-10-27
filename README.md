@@ -195,6 +195,7 @@ bootstrap.sh     # 统一入口
 modules/         # 按功能划分的安装模块
 lib/             # 系统检测、下载、包管理与配置部署
 config/          # 默认安装配置和程序配置
+scripts/         # 镜像与固定版本维护
 tests/run.sh     # 基础检查
 ```
 
@@ -205,3 +206,22 @@ bash tests/run.sh
 ```
 
 Clash 的完整安装流程、终端交互和 GPU 展示仍需在目标环境实机验证。
+
+### 维护 Clash 镜像
+
+需要 `git`、`gh`、官方 `gitee` CLI、`jq`、`curl` 和 `shasum`；`gh`、`gitee` 分别登录 `PercyWei`、`back_door`。可用 `GITEE_BIN` 指定 Gitee CLI 的绝对路径，`CLASHCTL_REPO_DIR` 指定本地克隆目录，默认使用仓库同级的 `clashctl`。
+
+```bash
+# 同步上游 master 到 PercyWei/clashctl 和 back_door/clashctl，不改安装固定版本
+bash scripts/update-clash.sh sync
+
+# 包含同步，更新指定提交及源码归档 SHA-256；安装器适配仍需人工审查
+bash scripts/update-clash.sh source e38d643725594c38c3fb02f355a2c89eba9c296c
+
+# 发布指定稳定版本的组件包
+bash scripts/update-clash.sh packages v1.19.33 v4.54.1
+```
+
+`packages` 按官方 Release 提供的 SHA-256 摘要校验安装包，发布或复用 Gitee 附件，经匿名下载核对后更新本地固定版本、README 和默认配置。旧 Release 和附件保留，相同内容复用，不同内容报错，可重复执行。
+
+`source`、`packages` 要求 `modules/clash.sh`、`README.md`、`config/default.conf` 无未提交改动。脚本不安装或升级服务器，也不提交本地变更。

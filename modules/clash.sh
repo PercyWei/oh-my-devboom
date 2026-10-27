@@ -6,7 +6,12 @@ module_clash() {
     local commit=e38d643725594c38c3fb02f355a2c89eba9c296c
     local source_url="https://gitee.com/back_door/clashctl/repository/archive/$commit.tar.gz"
     local archive_sha256=172e68840d6b81e454950f90e81439fc0ca424e589b1f2f5de36aa9a39d12fef
-    local mihomo_version=v1.19.33 yq_version=v4.54.1
+    local mihomo_version=v1.19.33
+    local yq_version=v4.54.1
+    local mihomo_amd64_sha256=8ec92e7b2fdc6b853ba00156bab7e4e965c8b0d843b8c4ac8ab98795f02ad524
+    local mihomo_arm64_sha256=ba408b317080ee265c46cb923a50018c1b82cbd708551cdd46a1e3e307396187
+    local yq_amd64_sha256=e68a456f90c577af3fe4960184b3a3cf5c461e0348407c10f107da3a5fec8972
+    local yq_arm64_sha256=8c27f6e7476fb5acefb9352e3d30f6bc2dc93f1956eb92e8da727173fb7ec6d3
     local packages_url="https://gitee.com/back_door/clashctl/releases/download/mihomo-$mihomo_version-yq-$yq_version"
     local mihomo_file yq_file mihomo_sha256 yq_sha256 component package_file package_sha256 archive_file
     local complete=0 result=0 RECORD_PACKAGE_RESULTS=0
@@ -52,15 +57,15 @@ module_clash() {
         case "$ARCH" in
             x86_64)
                 mihomo_file="mihomo-linux-amd64-v1-$mihomo_version.gz"
-                mihomo_sha256=8ec92e7b2fdc6b853ba00156bab7e4e965c8b0d843b8c4ac8ab98795f02ad524
+                mihomo_sha256=$mihomo_amd64_sha256
                 yq_file=yq_linux_amd64.tar.gz
-                yq_sha256=e68a456f90c577af3fe4960184b3a3cf5c461e0348407c10f107da3a5fec8972
+                yq_sha256=$yq_amd64_sha256
                 ;;
             aarch64)
                 mihomo_file="mihomo-linux-arm64-$mihomo_version.gz"
-                mihomo_sha256=ba408b317080ee265c46cb923a50018c1b82cbd708551cdd46a1e3e307396187
+                mihomo_sha256=$mihomo_arm64_sha256
                 yq_file=yq_linux_arm64.tar.gz
-                yq_sha256=8c27f6e7476fb5acefb9352e3d30f6bc2dc93f1956eb92e8da727173fb7ec6d3
+                yq_sha256=$yq_arm64_sha256
                 ;;
             *) record_result failed Clash "Gitee 安装包不支持当前架构：$ARCH"; return 1 ;;
         esac
