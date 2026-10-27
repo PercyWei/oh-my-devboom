@@ -54,8 +54,9 @@ module_zsh() {
         return 1
     }
     result=0
+    # Bash 重定向后直接执行 Antidote，避免嵌套 Zsh 重置 SIGTTOU 处理。
     ANTIDOTE_HOME="$XDG_DATA_HOME/oh-my-devboom/plugins" \
-        run_git_download zsh -f -c 'source "$1/antidote.zsh" && antidote bundle < "$2"' \
+        run_git_download bash -c 'exec zsh -f "$1/antidote.zsh" bundle < "$2"' \
         oh-my-devboom "$antidote_dir" "$plugins" > "$staging" || result=$?
     if [[ "$result" != 0 ]]; then
         rm -f -- "$staging"
