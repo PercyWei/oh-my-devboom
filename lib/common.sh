@@ -43,7 +43,11 @@ run_git_download() (
     trap 'log_error "Git download timed out after $git_timeout seconds; adjust git_timeout or check network/proxy access."; exit 1' ALRM
     # Separate process groups let cleanup include grandchildren, not just git itself.
     set -m
-    "$@" &
+    (
+        # Zsh read -d changes terminal attributes even when reading a file.
+        trap '' TTOU
+        exec "$@"
+    ) </dev/null &
     download_pid=$!
     (
         trap - EXIT HUP INT TERM ALRM

@@ -409,6 +409,40 @@ FIXTURE
             done
         done
         unset -f sleep
+        if command -v script >/dev/null 2>&1 && command -v zsh >/dev/null 2>&1; then
+            cat > "$TEST_ROOT/git-tty.sh" <<'FIXTURE'
+source "$1/lib/common.sh"
+GIT_TIMEOUT=2
+GITHUB_PROXY=''
+[[ -t 0 ]] || exit 1
+parent_trap=$(trap -p TTOU)
+status=0
+# Antidote uses read -d with heredoc input; Zsh touches the controlling terminal.
+run_git_download zsh -f -c 'read -rd "" value <<< "fixture text" || :; kill -s TTOU $$; print -r -- "$value"' \
+    > "$2/tty-result" 2> "$2/tty-errors" || status=$?
+[[ "$(trap -p TTOU)" == "$parent_trap" ]] || status=1
+printf '%s\n' "$status" > "$2/tty-status"
+FIXTURE
+            tty_platform=$(uname -s)
+            case "$tty_platform" in
+                Darwin)
+                    script -q "$TEST_ROOT/tty-session.log" "$BASH_BIN" "$TEST_ROOT/git-tty.sh" "$REPO_ROOT" "$TEST_ROOT" < /dev/null > /dev/null 2>&1 || :
+                    ;;
+                Linux)
+                    printf -v tty_command '%q ' "$BASH_BIN" "$TEST_ROOT/git-tty.sh" "$REPO_ROOT" "$TEST_ROOT"
+                    SHELL="$BASH_BIN" script -q -c "$tty_command" "$TEST_ROOT/tty-session.log" < /dev/null > /dev/null 2>&1 || :
+                    ;;
+                *) printf 'SKIP: real TTY check supports macOS and Linux script\n' ;;
+            esac
+            case "$tty_platform" in
+                Darwin|Linux)
+                    assert_equal 0 "$(cat "$TEST_ROOT/tty-status")" 'Background Zsh must not stop on terminal access'
+                    assert_equal 'fixture text' "$(cat "$TEST_ROOT/tty-result")" 'Child Zsh reads heredoc input and inherits ignored SIGTTOU'
+                    ;;
+            esac
+        else
+            printf 'SKIP: real TTY check requires script and zsh\n'
+        fi
         export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=devboom.fixture GIT_CONFIG_VALUE_0=preserved
         GITHUB_PROXY=https://proxy.example/
         run_git_download "$BASH_BIN" -c '
