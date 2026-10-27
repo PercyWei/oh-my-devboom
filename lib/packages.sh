@@ -1,16 +1,23 @@
 #!/usr/bin/env bash
 
 run_privileged() {
-    local result=0
+    local result=0 key sudo_command=(sudo)
+    [[ "$INTERACTIVE" != 0 ]] || sudo_command+=(-n)
+    if [[ "${CLASH_PROXY_ACTIVE:-0}" == 1 ]]; then
+        sudo_command+=(env)
+        for key in http_proxy HTTP_PROXY https_proxy HTTPS_PROXY all_proxy ALL_PROXY no_proxy NO_PROXY; do
+            sudo_command+=("$key=${!key}")
+        done
+    fi
     if [ "$USER_ID" -eq 0 ]; then
         "$@" || result=$?
     elif [ "$HAS_SUDO" -eq 0 ]; then
         log_warn "无法运行 $1：需要 root 或 sudo 权限。"
         return 2
     elif [ "$INTERACTIVE" -eq 1 ]; then
-        sudo "$@" || result=$?
+        "${sudo_command[@]}" "$@" || result=$?
     elif sudo -n true 2>/dev/null; then
-        sudo -n "$@" || result=$?
+        "${sudo_command[@]}" "$@" || result=$?
     else
         log_warn "无法运行 $1：当前非交互模式下 sudo 不可用。"
         return 2
@@ -27,6 +34,13 @@ ensure_packages() {
     local phase='安装软件包' reason='' action=''
     for cmd in "$@"; do
         case "$cmd" in
+            sha256sum|shuf|od|timeout) package=coreutils ;;
+            ss|ip)
+                case "$PACKAGE_MANAGER" in
+                    dnf|yum|zypper) package=iproute ;;
+                    *) package=iproute2 ;;
+                esac
+                ;;
             rg) package=ripgrep ;;
             fd)
                 case "$PACKAGE_MANAGER" in

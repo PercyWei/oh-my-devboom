@@ -16,7 +16,7 @@ assert_equal() {
 
 if [[ $# -eq 0 ]]; then
     failures=0
-    for test_case in detection arguments config idempotency packages remote fzf shell shell_login; do
+    for test_case in detection arguments config idempotency packages remote fzf shell shell_login clash; do
         if "$BASH_BIN" "$0" "$test_case"; then
             printf 'PASS: %s\n' "$test_case"
         else
@@ -99,16 +99,17 @@ RELEASE
         output=$("$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --help)
         [[ "$output" == *--config* && "$output" == *--modules* && "$output" == *--allow-remote* ]] || fail 'Help documents config, module and remote options'
         output=$("$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --list-modules)
-        for module in base homebrew zsh powerlevel10k tools dotfiles shell; do
+        for module in clash base homebrew zsh powerlevel10k tools dotfiles shell; do
             [[ "$output" == *"$module"* ]] || fail "Missing module in list: $module"
         done
         [[ "$output" != *starship* ]] || fail 'Removed Starship module is still listed'
         source "$REPO_ROOT/bootstrap.sh"
         parse_args --non-interactive
-        assert_equal 'base homebrew zsh powerlevel10k tools dotfiles shell' "$MODULES" 'Default config enables all listed modules, including login shell setup'
+        assert_equal 'clash base homebrew zsh powerlevel10k tools dotfiles shell' "$MODULES" 'Default config enables Clash first and login shell setup last'
         assert_equal 'fzf rg bat eza zoxide nvtop jq fd uv zellij' "$TOOLS" 'Default tools follow the grouped config order'
         assert_equal 'https://ghfast.top/' "$GITHUB_PROXY" 'Default config selects the GitHub download prefix'
         assert_equal 600 "$GIT_TIMEOUT" 'Default Git download timeout is ten minutes'
+        assert_equal '' "$CLASH_CONFIG_FILE" 'Default config requires a user-provided Clash YAML path'
         parse_args --modules powerlevel10k --non-interactive
         assert_equal powerlevel10k "$MODULES" 'Powerlevel10k module is accepted'
         parse_args --modules shell --non-interactive
@@ -135,25 +136,30 @@ RELEASE
         parse_args --config "$config_file" --modules dotfiles --tools fd --allow-remote --conflict skip --non-interactive
         assert_equal 'dotfiles|fd|1|skip' "$MODULES|$TOOLS|$ALLOW_REMOTE|$CONFLICT_POLICY" 'CLI overrides config when placed after --config'
 
-        printf '[options]\nallow_remote=true\nconflict=backup\ngithub_proxy=https://proxy.example:8443/prefix/\ngit_timeout=900\n' > "$TEST_ROOT/options.conf"
+        printf '[options]\nallow_remote=true\nconflict=backup\ngithub_proxy=https://proxy.example:8443/prefix/\ngit_timeout=900\n[clash]\nconfig_file = %s/my proxy.yaml\n' "$TEST_ROOT" > "$TEST_ROOT/options.conf"
         parse_args --config "$TEST_ROOT/options.conf" --non-interactive
         assert_equal '||1|backup' "$MODULES|$TOOLS|$ALLOW_REMOTE|$CONFLICT_POLICY" 'Omitted module and tool selections stay empty'
         assert_equal 'https://proxy.example:8443/prefix/' "$GITHUB_PROXY" 'A custom HTTPS prefix may include a port and path'
         assert_equal 900 "$GIT_TIMEOUT" 'Config can change the Git download timeout'
+        assert_equal "$TEST_ROOT/my proxy.yaml" "$CLASH_CONFIG_FILE" 'Clash accepts an absolute YAML path containing spaces'
         : > "$TEST_ROOT/empty.conf"
         parse_args --config "$TEST_ROOT/empty.conf" --non-interactive
         assert_equal '||0|skip' "$MODULES|$TOOLS|$ALLOW_REMOTE|$CONFLICT_POLICY" 'Loading another config resets selections and safe options'
         assert_equal '' "$GITHUB_PROXY" 'Loading another config resets the GitHub prefix'
         assert_equal 600 "$GIT_TIMEOUT" 'Loading another config resets the Git download timeout'
-        printf '[options]\ngithub_proxy=\n' > "$TEST_ROOT/direct.conf"
+        assert_equal '' "$CLASH_CONFIG_FILE" 'Loading another config resets the Clash YAML path'
+        printf '[options]\ngithub_proxy=\n[clash]\nconfig_file=\n' > "$TEST_ROOT/direct.conf"
         parse_args --config "$TEST_ROOT/direct.conf" --non-interactive
         assert_equal '' "$GITHUB_PROXY" 'An explicit empty prefix selects direct downloads'
+        assert_equal '' "$CLASH_CONFIG_FILE" 'An explicit empty Clash YAML path is accepted by the parser'
         output=$("$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --config "$TEST_ROOT/empty.conf" --non-interactive)
         [[ "$output" == *'未选择安装模块'* ]] || fail 'An empty config should complete without installation'
 
         for contents in '[unknown]' '[modules]\nunknown=true' '[tools]\nfzf=true\nfzf=false' \
             '[modules]\nbase=yes' '[options]\nconflict=replace' '[modules]\nbase' '[modules]\nbase="true"' \
-            '[options]\ngit_timeout=0' '[options]\ngit_timeout=-1' '[options]\ngit_timeout=1.5' '[options]\ngit_timeout='; do
+            '[options]\ngit_timeout=0' '[options]\ngit_timeout=-1' '[options]\ngit_timeout=1.5' '[options]\ngit_timeout=' \
+            '[clash]\nunknown=true' '[clash]\nconfig_file=relative.yaml' '[clash]\nconfig_file=~/clash.yaml' \
+            '[clash]\nconfig_file=/a.yaml\nconfig_file=/b.yaml'; do
             printf '%b\n' "$contents" > "$TEST_ROOT/invalid.conf"
             if parse_args --config "$TEST_ROOT/invalid.conf" --non-interactive > "$TEST_ROOT/output" 2>&1; then
                 fail "Invalid config was accepted: $contents"
@@ -350,6 +356,28 @@ RELEASE
         available=fdfind
         TOOLS=fd
         module_tools
+
+        # sudo receives only the proxy variables owned by the Clash module.
+        sudo() { printf '%s\n' "$*" >> "$TEST_ROOT/sudo.log"; }
+        USER_ID=4242
+        HAS_SUDO=1
+        http_proxy=http://lower-http HTTP_PROXY=http://upper-http
+        https_proxy=http://lower-https HTTPS_PROXY=http://upper-https
+        all_proxy=socks5://lower-all ALL_PROXY=socks5://upper-all
+        no_proxy=localhost,127.0.0.1 NO_PROXY=localhost,::1
+        CLASH_PROXY_ACTIVE=1
+        expected='env http_proxy=http://lower-http HTTP_PROXY=http://upper-http https_proxy=http://lower-https HTTPS_PROXY=http://upper-https all_proxy=socks5://lower-all ALL_PROXY=socks5://upper-all no_proxy=localhost,127.0.0.1 NO_PROXY=localhost,::1 printf fixture'
+        INTERACTIVE=1
+        run_privileged printf fixture
+        assert_equal "$expected" "$(cat "$TEST_ROOT/sudo.log")" 'Interactive sudo passes the eight proxy variables explicitly'
+        : > "$TEST_ROOT/sudo.log"
+        INTERACTIVE=0
+        run_privileged printf fixture
+        assert_equal "$(printf '%s\n-n %s' '-n true' "$expected")" "$(cat "$TEST_ROOT/sudo.log")" 'Non-interactive sudo keeps its probe and forwards proxy variables without sudo -E'
+        : > "$TEST_ROOT/sudo.log"
+        CLASH_PROXY_ACTIVE=0
+        run_privileged printf fixture
+        assert_equal "$(printf '%s\n' '-n true' '-n printf fixture')" "$(cat "$TEST_ROOT/sudo.log")" 'Inactive Clash leaves the existing sudo invocation unchanged'
         ;;
     remote)
         source "$REPO_ROOT/lib/common.sh"
@@ -819,6 +847,157 @@ ZSH
         OS=macos USER_ID=501 INTERACTIVE=1 HAS_SUDO=0 chsh_mode=change
         module_shell
         assert_equal "$target" "$(cat "$account_file")" 'macOS reads and confirms the shell through dscl'
+        ;;
+    clash)
+        source "$REPO_ROOT/bootstrap.sh"
+        # main sources only these fixture modules; no real installer is reachable.
+        ROOT_DIR="$TEST_ROOT/repo"
+        mkdir -p "$ROOT_DIR/modules"
+        : > "$TEST_ROOT/install.conf"
+        detect_system() {
+            OS=$fixture_os DISTRO=fixture ARCH=x86_64 USER_ID=4242
+            PACKAGE_MANAGER=none IN_CONTAINER=1 HAS_SUDO=0
+        }
+        cat > "$ROOT_DIR/modules/clash.sh" <<'MODULE'
+module_clash() {
+    printf 'clash\n' >> "$TEST_ROOT/modules.log"
+    if [[ "$OS" == macos ]]; then
+        record_result skipped Clash 'Linux only'
+        return 2
+    fi
+    case "$clash_status" in
+        1) record_result failed Clash 'fixture failure'; return 1 ;;
+        2) record_result skipped Clash 'fixture denied'; return 2 ;;
+    esac
+    export http_proxy=http://fixture-proxy CLASH_PROXY_ACTIVE=1
+    record_result ready Clash 'fixture proxy ready'
+}
+MODULE
+        cat > "$ROOT_DIR/modules/base.sh" <<'MODULE'
+module_base() {
+    printf 'base\n' >> "$TEST_ROOT/modules.log"
+    if [[ "$OS" == linux ]]; then
+        assert_equal 1 "$CLASH_PROXY_ACTIVE" 'Later modules see the active Clash state'
+        assert_equal http://fixture-proxy "$("$BASH_BIN" -c 'printf "%s" "$http_proxy"')" 'Child commands inherit the activated proxy'
+    fi
+    record_result ready base 'fixture base ready'
+}
+module_tools() {
+    printf 'tools\n' >> "$TEST_ROOT/modules.log"
+    [[ "$tools_status" == 0 ]] || return "$tools_status"
+    record_result ready tools 'fixture tools ready'
+}
+MODULE
+        cp "$ROOT_DIR/modules/base.sh" "$ROOT_DIR/modules/tools.sh"
+        for scenario in success failed denied downstream_failed macos; do
+            fixture_os=linux clash_status=0 tools_status=0
+            case "$scenario" in
+                failed) clash_status=1 ;;
+                denied) clash_status=2 ;;
+                downstream_failed) tools_status=1 ;;
+                macos) fixture_os=macos ;;
+            esac
+            : > "$TEST_ROOT/modules.log"
+            status=0
+            output=$(main --config "$TEST_ROOT/install.conf" --modules tools,base,clash --tools jq --non-interactive 2>&1) || status=$?
+            case "$scenario" in
+                failed|denied)
+                    assert_equal 1 "$status" 'An unavailable Linux Clash prerequisite fails the run'
+                    assert_equal clash "$(cat "$TEST_ROOT/modules.log")" 'Clash failure prevents every later module from running'
+                    expected=$(printf '%q' tools,base,clash)
+                    [[ "$output" == *"--modules $expected"* ]] || fail 'Clash failure retry omits the original module selection'
+                    ;;
+                *)
+                    assert_equal "$(printf 'clash\nbase\ntools')" "$(cat "$TEST_ROOT/modules.log")" 'Clash runs first regardless of CLI selection order'
+                    if [[ "$scenario" == downstream_failed ]]; then
+                        assert_equal 1 "$status" 'A later module failure still reports failure'
+                        expected=$(printf '%q' clash,tools)
+                        [[ "$output" == *"--modules $expected"* ]] || fail 'Later failure retry omits Clash activation'
+                    else
+                        assert_equal 0 "$status" 'Ready Linux Clash or skipped macOS Clash permits later modules'
+                    fi
+                    ;;
+            esac
+        done
+
+        ROOT_DIR=$REPO_ROOT
+        source "$ROOT_DIR/modules/clash.sh"
+        OS=macos
+        status=0
+        module_clash > "$TEST_ROOT/module.log" 2>&1 || status=$?
+        assert_equal 2 "$status" 'The real Clash module skips macOS before making changes'
+        if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+            OS=linux status=0
+            module_clash > "$TEST_ROOT/module.log" 2>&1 || status=$?
+            assert_equal 1 "$status" 'The real Clash module rejects old Bash on Linux'
+            [[ "$(cat "$TEST_ROOT/module.log")" == *'Bash 4'* ]] || fail 'Old Bash failure does not explain its requirement'
+        fi
+
+        # Exercise the real worker against a local upstream fixture, including CRLF normalization.
+        clash_dir="$TEST_ROOT/clashctl"
+        mkdir -p "$clash_dir/scripts/cmd" "$clash_dir/data"
+        : > "$clash_dir/data/meta"
+        cat > "$clash_dir/scripts/cmd/clashctl.sh" <<'UPSTREAM'
+BIN_YQ=fixture_yq
+CLASH_DATA_DIR="$CLASHCTL_HOME/data"
+CLASH_PROFILES_META="$CLASH_DATA_DIR/meta"
+CLASH_CONFIG_BASE="$CLASH_DATA_DIR/profile.yaml"
+CLASH_CONFIG_MIXIN="$CLASH_DATA_DIR/mixin.yaml"
+CLASH_CONFIG_RUNTIME="$CLASH_DATA_DIR/runtime.yaml"
+fixture_yq() {
+    case "$1" in
+        '.use // ""') cat "$CLASH_PROFILES_META" ;;
+        *'.path') [[ ! -f "$CLASH_CONFIG_BASE" ]] || printf '%s\n' "$CLASH_CONFIG_BASE" ;;
+        *'.url') [[ ! -f "$CLASH_CONFIG_BASE" ]] || printf 'file://%s/devboom-source.yaml\n' "$CLASH_DATA_DIR" ;;
+        -e) return 0 ;;
+        '.mode // "rule"') printf 'rule\n' ;;
+        *) return 99 ;;
+    esac
+}
+_normalize_sub_config() {
+    tr -d '\r' < "$1" > "$1.normalized" && mv "$1.normalized" "$1"
+}
+clashctl() {
+    printf '%s\n' "$*" >> "$CLASHCTL_HOME/operations.log"
+    case "$1 ${2:-}" in
+        'sub add'|'sub update')
+            cp "$CLASH_DATA_DIR/devboom-source.yaml" "$CLASH_CONFIG_BASE"
+            printf 'devboom\n' > "$CLASH_PROFILES_META"
+            ;;
+        'sub use') printf 'devboom\n' > "$CLASH_PROFILES_META" ;;
+        'on ')
+            export http_proxy=http://127.0.0.1:7890 HTTP_PROXY=http://127.0.0.1:7890
+            export https_proxy=http://127.0.0.1:7890 HTTPS_PROXY=http://127.0.0.1:7890
+            export all_proxy=socks5://127.0.0.1:7891 ALL_PROXY=socks5://127.0.0.1:7891
+            export no_proxy=localhost,127.0.0.1 NO_PROXY=localhost,127.0.0.1
+            ;;
+        *) return 99 ;;
+    esac
+}
+curl() {
+    printf '%s\n' "$@" > "$CLASHCTL_HOME/curl.args"
+    [[ ! -e "$CLASHCTL_HOME/curl-failure" ]]
+}
+UPSTREAM
+        printf 'mode: rule\r\n' > "$TEST_ROOT/local proxy.yaml"
+        : > "$TEST_ROOT/proxy.env"
+        for attempt in 1 2; do
+            "$BASH_BIN" "$ROOT_DIR/lib/clashctl.sh" "$clash_dir" "$TEST_ROOT/local proxy.yaml" "$TEST_ROOT/proxy.env"
+        done
+        assert_equal "$(printf 'sub add --raw --name devboom --use file://%s/data/devboom-source.yaml\non\non' "$clash_dir")" "$(cat "$clash_dir/operations.log")" 'Repeated normalized YAML does not import or update the profile again'
+        assert_equal "$(printf 'mode: rule\r')" "$(cat "$TEST_ROOT/local proxy.yaml")" 'Normalization preserves the original user YAML'
+        values=()
+        while IFS= read -r -d '' value; do values+=("$value"); done < "$TEST_ROOT/proxy.env"
+        assert_equal 8 "${#values[@]}" 'Successful worker writes exactly eight NUL-delimited proxy values'
+        assert_equal 'http://127.0.0.1:7890|http://127.0.0.1:7890|http://127.0.0.1:7890|http://127.0.0.1:7890|socks5://127.0.0.1:7891|socks5://127.0.0.1:7891|localhost,127.0.0.1|localhost,127.0.0.1' "$(IFS='|'; printf '%s' "${values[*]}")" 'Worker proxy values keep the documented field order'
+        expected=$(printf '%s\n' --silent --show-error --proxy http://127.0.0.1:7890 --noproxy '' --head --fail --location --connect-timeout 10 --max-time 30 https://github.com/)
+        assert_equal "$expected" "$(cat "$clash_dir/curl.args")" 'Connectivity probe explicitly uses the proxy and bounded download time'
+        : > "$clash_dir/curl-failure"
+        : > "$TEST_ROOT/proxy.env"
+        status=0
+        "$BASH_BIN" "$ROOT_DIR/lib/clashctl.sh" "$clash_dir" "$TEST_ROOT/local proxy.yaml" "$TEST_ROOT/proxy.env" || status=$?
+        assert_equal 1 "$status" 'Failed connectivity prevents a successful worker result'
+        [[ ! -s "$TEST_ROOT/proxy.env" ]] || fail 'Failed connectivity still handed proxy values to the parent'
         ;;
     *) fail "Unknown test case: $1" ;;
 esac

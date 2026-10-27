@@ -12,6 +12,7 @@ print_styled() {
 
 module_label() {
     case "$1" in
+        clash) printf 'Clash 代理' ;;
         base) printf '基础工具' ;;
         homebrew) printf 'Homebrew' ;;
         zsh) printf 'Zsh Augmented' ;;

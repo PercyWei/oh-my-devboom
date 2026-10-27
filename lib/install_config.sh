@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-AVAILABLE_MODULES='base homebrew zsh powerlevel10k tools dotfiles shell'
+AVAILABLE_MODULES='clash base homebrew zsh powerlevel10k tools dotfiles shell'
 AVAILABLE_TOOLS='uv fzf rg bat eza zoxide zellij nvtop jq fd'
 
 load_install_config() {
@@ -11,6 +11,7 @@ load_install_config() {
     CONFLICT_POLICY=skip
     GITHUB_PROXY=''
     GIT_TIMEOUT=600
+    CLASH_CONFIG_FILE=''
     if [[ ! -f "$file" || ! -r "$file" ]]; then
         log_error "Cannot read installation config: $file"
         return 1
@@ -22,7 +23,7 @@ load_install_config() {
         line=${line%"${line##*[![:space:]]}"}
         [[ -n "$line" ]] || continue
         case "$line" in
-            '[modules]'|'[tools]'|'[options]')
+            '[modules]'|'[tools]'|'[clash]'|'[options]')
                 section=${line#\[}
                 section=${section%\]}
                 continue
@@ -59,13 +60,24 @@ load_install_config() {
                     *) log_error "$file:$line_number: Unknown option: $key"; return 1 ;;
                 esac
                 ;;
+            clash)
+                [[ "$key" == config_file ]] || {
+                    log_error "$file:$line_number: Unknown clash setting: $key"; return 1;
+                }
+                ;;
         esac
         if [[ "$seen" == *" $section.$key "* ]]; then
             log_error "$file:$line_number: Duplicate key: $section.$key"
             return 1
         fi
         seen="$seen$section.$key "
-        if [[ "$section:$key" == options:conflict ]]; then
+        if [[ "$section:$key" == clash:config_file ]]; then
+            if [[ -n "$value" && "$value" != /* ]]; then
+                log_error "$file:$line_number: clash.config_file must be empty or an absolute path"
+                return 1
+            fi
+            CLASH_CONFIG_FILE=$value
+        elif [[ "$section:$key" == options:conflict ]]; then
             case "$value" in
                 skip|backup) CONFLICT_POLICY=$value ;;
                 *) log_error "$file:$line_number: conflict must be skip or backup"; return 1 ;;

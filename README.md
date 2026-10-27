@@ -8,6 +8,7 @@
 
 | 类别 | 内容 | 模块 |
 | --- | --- | --- |
+| 网络代理 | clashctl、Mihomo 内核和 yq；从服务器本地 YAML 导入配置，安装期间启用代理，结束后关闭 | `clash`（仅 Linux） |
 | 基础工具 | git、curl、wget、vim、unzip、zsh | `base` |
 | 包管理器 | Homebrew | `homebrew` |
 | Zsh Augmented | Antidote 插件管理器，以及 zsh-completions（补全）、zsh-autosuggestions（输入建议）、zsh-syntax-highlighting（语法高亮） | `zsh` |
@@ -34,7 +35,7 @@
 
 ## 快速开始
 
-先准备 `git`，克隆仓库，复制默认安装配置后按需修改：
+先准备 `git`。Linux 还需将 Clash/Mihomo YAML 放到服务器，例如 `/root/clash.yaml`。克隆仓库，复制默认安装配置后按需修改：
 
 ```bash
 git clone https://github.com/PercyWei/oh-my-devboom.git
@@ -44,25 +45,34 @@ vim config/local.conf
 bash bootstrap.sh --config config/local.conf
 ```
 
-安装前会显示环境、模块、工具及安装策略，确认后执行；未授权的上游下载会逐项询问。执行中显示模块编号、名称与耗时，例如 `[3/6] Zsh Augmented (zsh)`；配置和命令行仍使用 `zsh` 作为模块标识。
+Linux 在 `config/local.conf` 中填写本地文件路径：
+
+```ini
+[clash]
+config_file = /root/clash.yaml
+```
+
+不需要 Clash 时，将 `[modules]` 中的 `clash` 改为 `false`；macOS 自动跳过。路径可含空格，不加引号，不展开 `~` 或 `$HOME`。
+
+安装前会显示环境、模块、工具及安装策略，确认后执行；未授权的上游下载会逐项询问。执行中显示模块编号、名称与耗时；配置和命令行使用 `zsh` 表示 Zsh Augmented 模块。
 
 结束摘要逐模块列出已安装、已就绪、已部署、已备份、跳过和失败的组件，包含实际路径、未完成原因和处理建议。模块整体分为完成、部分完成、跳过和失败；已有组件复用计入完成。需要重试时会提供保留本次安装选项的命令，并按实际配置部署结果提示 Shell 启动与 Git 身份设置。
 
 终端支持时使用彩色状态标签，设置 `NO_COLOR=1` 或 `TERM=dumb` 可关闭颜色；重定向的输出使用普通文本。包管理器和上游安装器保留自身输出与输入提示。组件状态和最终摘要写入 stderr，保存完整记录时同时重定向两个输出流，例如 `bash bootstrap.sh --config config/local.conf --non-interactive > install.log 2>&1`。
 
-非交互执行使用 `--non-interactive`；上游安装脚本、插件、主题和发布包需设置 `allow_remote=true` 或传入 `--allow-remote`，否则跳过对应下载。
+非交互执行使用 `--non-interactive`；上游安装脚本、插件、主题和发布包需设置 `allow_remote=true` 或传入 `--allow-remote`，否则跳过对应下载。Linux 启用 `clash` 时，代理未就绪会停止后续安装。
 
 ```bash
 # 使用个人配置并授权上游下载
 bash bootstrap.sh --config config/local.conf --non-interactive --allow-remote
 
 # 临时安装全部模块和工具
-bash bootstrap.sh --non-interactive --allow-remote --modules all --tools all
+bash bootstrap.sh --config config/local.conf --non-interactive --allow-remote --modules all --tools all
 
-# 仅部署配置，保留冲突文件
+# 绕过 Clash，仅部署配置，保留冲突文件
 bash bootstrap.sh --non-interactive --modules dotfiles
 
-# 仅安装 jq 和 fd
+# 绕过 Clash，仅安装 jq 和 fd
 bash bootstrap.sh --non-interactive --modules tools --tools jq,fd
 ```
 
@@ -77,14 +87,15 @@ bash bootstrap.sh --non-interactive --modules tools --tools jq,fd
 | 章节 | 内容 |
 | --- | --- |
 | `[modules]` | 各功能模块的总开关，值为 `true` 或 `false` |
+| `[clash]` | `config_file` 为服务器本地 Clash/Mihomo YAML 的绝对路径；Linux 启用 `clash` 时必填 |
 | `[tools]` | 每个可选开发工具的开关；仅在 `[modules]` 中 `tools=true` 时生效 |
 | `[options]` | `allow_remote=true\|false` 控制[上游下载授权](#上游下载与授权)；`github_proxy` 设置 GitHub 加速前缀；`git_timeout` 设置 Git 任务限时（正整数秒）；`conflict=skip\|backup` 控制已有配置的处理方式 |
 
-默认启用全部模块，工具条目也全部选中，请按需关闭不需要的内容。
+默认启用全部模块，工具条目也全部选中。Linux 需先填写 `[clash] config_file`，或关闭 `clash`。已有个人配置若需启用代理，应加入 `[modules] clash=true` 和 `[clash] config_file`。
 
 `[modules]` 中的 `shell=true` 启用默认登录 Shell 设置，改为 `false` 可关闭。已有个人配置需要加入此项才会启用，也可用 `--modules shell` 单独执行。
 
-例如，安装基础工具、fzf、jq、fd 并部署配置：
+例如，绕过 Clash，安装基础工具、fzf、jq、fd 并部署配置：
 
 ```ini
 [modules]
@@ -102,7 +113,7 @@ allow_remote=false
 conflict=skip
 ```
 
-指定文件替代默认配置：未列出的模块和工具均关闭；未填写的选项采用 `allow_remote=false`、`conflict=skip`、`github_proxy=`（直连）、`git_timeout=600`。
+指定文件替代默认配置：未列出的模块和工具均关闭；未填写的选项采用 `allow_remote=false`、`conflict=skip`、`github_proxy=`（不加前缀）、`git_timeout=600`，`clash.config_file` 默认为空。
 
 支持空行、`#` 注释和赋值两侧的空白。值不加引号，不展开变量；未知章节、键或无效值会报错。
 
@@ -127,7 +138,7 @@ tests/run.sh              # 基础测试
 
 ## 模块与参数
 
-执行顺序固定：Linux 为 `base → homebrew → zsh → powerlevel10k → tools → dotfiles → shell`；macOS 交换前两个模块的顺序。仅执行选中的模块。
+执行顺序固定：Linux 为 `clash → base → homebrew → zsh → powerlevel10k → tools → dotfiles → shell`；macOS 跳过 `clash`，先执行 `homebrew` 再执行 `base`。仅执行选中的模块。
 
 | 参数 | 说明 |
 | --- | --- |
@@ -142,7 +153,39 @@ tests/run.sh              # 基础测试
 
 `--tools` 需配合 `tools` 模块使用。未知参数或无效值会报错。
 
-安装错误返回非零状态；权限不足、平台不支持、未授权或配置冲突导致的跳过会记录原因，不中断其他模块。退出码为零也可能存在跳过项，请检查结果摘要。
+Linux 上选中 `clash` 后，配置缺失、未授权、安装失败或代理检查失败都会中止后续模块并返回非零状态。其他模块的失败或跳过不阻止继续执行；错误返回非零状态，跳过会记录原因。退出码为零也可能存在跳过项，请检查结果摘要。
+
+## Clash 代理
+
+`clash` 使用 [nelvko/clashctl](https://github.com/nelvko/clashctl)，需要 Linux 和 Bash 4+，安装到 `${XDG_DATA_HOME:-$HOME/.local/share}/clashctl`，与 `oh-my-devboom` 数据目录同级。源码固定到提交 `e38d643725594c38c3fb02f355a2c89eba9c296c` 并校验归档 SHA-256；Mihomo 和 yq 的版本由上游安装器选择，未锁定。安装路径只能包含英文字母、数字、`/`、`_`、`.`、`-`。
+
+首次运行先通过系统包管理器准备依赖，再安装 clashctl；此阶段尚无新代理，GitHub 下载使用配置中的 `github_proxy`。Alpine 需要 GNU coreutils 和 tar。容器使用 `nohup` 后台运行，其他 Linux 由上游自动选择服务方式，已有同名服务冲突时会报错。
+
+本地 YAML 以 `0600` 权限复制到 `data/devboom-source.yaml`，导入为 `devboom` 配置，原文件保留且不上传到转换服务。重复运行复用相同配置；源内容改变时更新 `devboom`。若已启用其他配置，则报错，不切换或覆盖该配置。
+
+默认仅本机可访问代理和控制接口，关闭 TUN、局域网访问及面板下载；YAML 中对应设置会被 Mixin 覆盖。手动改变这些 Mixin 设置后，需恢复才能重跑 `clash` 模块。
+
+启用代理并通过 GitHub 访问检查后，才继续安装。本轮后续下载使用 GitHub 原始 URL 经 Clash 访问，不再叠加 `github_proxy`；代理变量也传给经 sudo 执行的包管理器。未启用 Clash 或 macOS 跳过该模块时，仍使用配置中的加速前缀。Clash 失败会停止安装，不自动退回加速模式。
+
+正常结束、报错退出或可捕获的中断时，会停止该安装目录的 Clash 内核；停止失败会报错并返回非零状态。安装文件和 YAML 保留，发起安装的终端环境不变。
+
+本仓库适配后的安装器不写入已有 `.bashrc` 或 `.zshrc`。仓库的 Zsh 配置会加载 clashctl 命令，新终端中按需执行：
+
+```bash
+clashctl on         # 启动内核并启用当前终端代理
+clashctl off --stop # 关闭当前终端代理并停止内核
+clashctl status     # 查看内核和代理状态
+```
+
+Bash 或未部署仓库 Zsh 配置的终端，先手动加载：
+
+```bash
+export CLASHCTL_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/clashctl"
+source "$CLASHCTL_HOME/scripts/cmd/clashctl.sh"
+clashctl on
+```
+
+已安装的 clashctl 不会自动升级；手动执行上游 `clashctl update` 会替换源码，可能移除本仓库的 Shell 配置适配。
 
 ## Linux 与 macOS
 
@@ -173,8 +216,8 @@ xcode-select --install
 容器中使用系统包管理器，跳过 Homebrew。以实际工作账户运行以下命令；若需要输入 sudo 密码，去掉 `--non-interactive`：
 
 ```bash
-bash bootstrap.sh --non-interactive --allow-remote \
-  --modules base,zsh,powerlevel10k,tools,dotfiles,shell
+bash bootstrap.sh --config config/local.conf --non-interactive --allow-remote \
+  --modules clash,base,zsh,powerlevel10k,tools,dotfiles,shell
 exec zsh
 ```
 
@@ -220,7 +263,7 @@ Powerlevel10k 需要 Zsh 5.1+，安装在 `${XDG_DATA_HOME:-$HOME/.local/share}/
 - 存在冲突：默认 `skip`，保留原文件。
 - 使用 `--conflict backup`：将原文件、目录或链接备份后再部署，日志显示带时间戳的备份路径。
 
-示例：
+绕过 Clash，仅重新部署配置：
 
 ```bash
 bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
@@ -241,6 +284,7 @@ git config --file "$HOME/.gitconfig.local" user.email "you@example.com"
 
 | 安装内容 | 上游来源 |
 | --- | --- |
+| clashctl 安装器及 Mihomo、yq 组件 | [clashctl 固定提交 e38d643](https://github.com/nelvko/clashctl/tree/e38d643725594c38c3fb02f355a2c89eba9c296c)，归档校验 SHA-256；组件由其安装器下载 |
 | Homebrew 官方安装脚本 | [Homebrew/install](https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh) |
 | uv 官方安装脚本及其下载的工具 | [Astral 安装器](https://astral.sh/uv/install.sh) |
 | Antidote 插件管理器 | [v2.3.0 固定提交](https://github.com/mattmc3/antidote/tree/9bb69ab99c6f05d6e6ae237f7ce222eeeb5b4a14) |
@@ -251,15 +295,15 @@ git config --file "$HOME/.gitconfig.local" user.email "you@example.com"
 
 通过 APT、Homebrew、pacman 等包管理器安装，以及本地配置部署，不受此开关限制。例如，uv 或 Zellij 通过已有 Homebrew 安装时无需授权。
 
-设置 `allow_remote=true` 或传入 `--allow-remote` 可授权所选内容。未授权时，交互模式逐项确认，非交互模式跳过。
+设置 `allow_remote=true` 或传入 `--allow-remote` 可授权所选内容。未授权时，交互模式逐项确认，非交互模式跳过；Linux 的 `clash` 未就绪会中止后续安装。
 
-`github_proxy` 默认为第三方服务 `https://ghfast.top/`，用于项目管理的 `github.com`、`raw.githubusercontent.com` 文件下载及 Git 克隆、拉取（Git 2.31+）。前缀须为以 `/` 结尾的 HTTPS URL；设为空或在自定义配置中省略时直连。Git 加速仅在下载期间生效，保留原有配置和 `origin`。
+`github_proxy` 默认为第三方服务 `https://ghfast.top/`，在 Clash 尚未启用时用于项目管理的 `github.com`、`raw.githubusercontent.com` 文件下载及 Git 克隆、拉取（Git 2.31+），包括 clashctl 的首次下载安装。Clash 就绪后，本轮下载停用该前缀。前缀须为以 `/` 结尾的 HTTPS URL；设为空或在自定义配置中省略时不加前缀。Git 加速仅在下载期间生效，保留原有配置和 `origin`。
 
-日志显示官方来源和加速地址；下载仍需授权，并执行原有固定提交和 SHA-256 校验。失败时不自动切换来源。代理不覆盖包管理器、`astral.sh` 及 Homebrew、uv 安装器内部的下载。
+日志显示官方来源和加速地址；下载仍需授权，并执行原有固定提交和 SHA-256 校验。失败时不自动切换来源。GitHub 加速前缀不覆盖包管理器、`astral.sh` 及 Homebrew、uv 安装器内部的下载；这些命令在 Clash 启用后可使用本轮导出的代理环境变量。
 
 Homebrew、uv 安装脚本随上游更新，未固定版本。未预授权时，交互模式先下载审查副本、显示来源及可用的 SHA-256，再确认执行；该校验值用于标识文件，不代表上游签名。
 
-已有工具不会自动升级；系统包、Homebrew 包及安装器下载的工具版本未锁定。项目管理的下载使用以下超时，失败后继续其他模块：
+已有工具不会自动升级；系统包、Homebrew 包及安装器下载的工具版本未锁定。项目管理的下载使用以下超时；Clash 失败会停止后续安装，其他下载失败后继续其他模块：
 
 | 下载方式 | 超时与重试 |
 | --- | --- |
@@ -267,7 +311,7 @@ Homebrew、uv 安装脚本随上游更新，未固定版本。未预授权时，
 | wget | 网络等待超时 30 秒；GNU wget 最多尝试 3 次，BusyBox wget 不重试，且其 DNS 查询不受该参数限制 |
 | Git | Antidote 克隆、整批插件下载、Powerlevel10k 拉取各限时 `git_timeout` 秒，默认 600 秒；HTTP 传输连续 30 秒低于 1 字节/秒也会中止 |
 
-上述超时不适用于 Homebrew、uv 安装器内部及包管理器。
+clashctl 组件下载每次尝试最多 300 秒，代理联网检查限时 30 秒。上述超时不适用于 Homebrew、uv 安装器内部及包管理器。
 
 gitstatusd 支持 Linux/macOS 的 x86_64 和 ARM64，缓存于 `${XDG_CACHE_HOME:-$HOME/.cache}/oh-my-devboom/gitstatus`。清理缓存后，重跑 `powerlevel10k` 模块恢复。
 
@@ -280,9 +324,9 @@ bash tests/run.sh
 git ls-files -z '*.sh' | xargs -0 -n 1 bash -n
 ```
 
-覆盖系统检测、配置与参数解析、幂等性、配置部署、默认登录 Shell 设置、Shell 初始化、GitHub 加速及下载失败处理。Shell 集成检查需要 Zsh，缺失时跳过；CI 在 Ubuntu 和 macOS 上运行这些检查。
+覆盖系统检测、配置与参数解析、幂等性、配置部署、Clash 调度与代理环境传递、默认登录 Shell 设置、Shell 初始化、GitHub 加速及下载失败处理。Shell 集成检查需要 Zsh，缺失时跳过；CI 在 Ubuntu 和 macOS 上运行这些检查。
 
-实机复测需检查 `z`、`zi`、fzf 快捷键和 Powerlevel10k Git 状态；NVTOP 的 GPU 数据展示需在具备设备访问权限的环境验证。
+Clash 的真实下载、配置导入和服务启动仍需在新 Linux 容器复测。实机还需检查 `z`、`zi`、fzf 快捷键和 Powerlevel10k Git 状态；NVTOP 的 GPU 数据展示需在具备设备访问权限的环境验证。
 
 ## 常见问题
 
@@ -292,9 +336,11 @@ git ls-files -z '*.sh' | xargs -0 -n 1 bash -n
 
 **安装后命令仍找不到？** 重开终端或启动 `zsh`，并检查日志中是否有失败或跳过项。
 
-**插件或主题下载失败怎么办？** 检查日志中的下载地址和错误。Git 总时限可在所用配置的 `[options]` 中通过 `git_timeout` 调整；连接失败或 HTTP 低速超时仍需排查网络。默认经 ghfast.top 加速，设置 `github_proxy=` 可直连。处理后沿用原配置重跑失败模块，例如：`bash bootstrap.sh --config config/local.conf --non-interactive --allow-remote --modules zsh,powerlevel10k`。
+**Clash 导致安装停止？** 检查 `[clash] config_file` 是否为可读的服务器本地 YAML、是否授权上游安装，以及日志中的代理连接错误。处理后沿用原配置重跑。已有可用网络且不需要 Clash，可设置 `[modules] clash=false`，或通过 `--modules` 选择不含 `clash` 的模块。
 
-**fzf 已安装，但快捷键不可用？** 运行 `bash bootstrap.sh --non-interactive --modules tools --tools fzf` 补齐 Shell 集成，再重开 Zsh。Debian/Ubuntu 旧版脚本从系统包源获取，无需 `--allow-remote`；若源中已无对应版本，先用原包管理器升级 fzf。
+**插件或主题下载失败怎么办？** 检查日志中的下载地址和错误。Git 总时限可在所用配置的 `[options]` 中通过 `git_timeout` 调整；连接失败或 HTTP 低速超时仍需排查网络。启用 Clash 后使用原始 URL，经代理下载；未启用时默认经 ghfast.top 加速，可设置 `github_proxy=` 取消前缀。需要 Clash 时沿用原配置重跑：`bash bootstrap.sh --config config/local.conf --non-interactive --allow-remote --modules clash,zsh,powerlevel10k`；已有可用网络时去掉 `clash` 即绕过代理初始化。
+
+**fzf 已安装，但快捷键不可用？** 运行 `bash bootstrap.sh --non-interactive --modules tools --tools fzf` 绕过 Clash、补齐 Shell 集成，再重开 Zsh。Debian/Ubuntu 旧版脚本从系统包源获取，无需 `--allow-remote`；若源中已无对应版本，先用原包管理器升级 fzf。
 
 **只安装 Prompt，不接管 Shell 配置？** 只选择 `powerlevel10k`，将 `config/powerlevel10k/p10k.zsh` 复制或链接到 `${ZDOTDIR:-$HOME}/.p10k.zsh`，再参照 `config/zsh/zshrc`，把 instant prompt 和主题、预设的加载语句加入自己的 `.zshrc`。
 

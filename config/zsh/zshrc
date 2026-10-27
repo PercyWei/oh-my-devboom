@@ -10,6 +10,16 @@ export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
 
+# 提供 clashctl 命令；新终端按需运行 clashctl on 启用代理。
+_devboom_clash_home="$XDG_DATA_HOME/clashctl"
+if [[ -r "$_devboom_clash_home/scripts/cmd/clashctl.sh" &&
+      -r "$_devboom_clash_home/.clashctl-format" &&
+      "$(<"$_devboom_clash_home/.clashctl-format")" == 1 ]]; then
+    export CLASHCTL_HOME="${_devboom_clash_home:A}"
+    source "$CLASHCTL_HOME/scripts/cmd/clashctl.sh"
+fi
+unset _devboom_clash_home
+
 # Zsh 的 path 数组自动同步 PATH；-U 避免重复加入同一路径。
 typeset -U path fpath
 path=("$HOME/.local/bin" $path)

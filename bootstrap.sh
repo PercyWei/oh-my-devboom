@@ -15,12 +15,13 @@ Usage: ./bootstrap.sh [options]
 Set up a personal development environment on Linux or macOS (Bash 3.2+).
 
   --config FILE     Installation settings (default: config/default.conf)
-  --modules LIST    Override modules: base,homebrew,zsh,powerlevel10k,tools,dotfiles,shell
+  --modules LIST    Override modules: clash,base,homebrew,zsh,powerlevel10k,tools,dotfiles,shell
                     Comma-separated names, or all.
   --tools LIST      Override tools: uv,fzf,rg,bat,eza,zoxide,zellij,nvtop,jq,fd
                     Comma-separated names, or all. Requires the tools module.
   --non-interactive Run without prompts; required when stdin is not a terminal
   --allow-remote    Authorize direct upstream downloads and execution:
+                    clashctl and its Mihomo/yq components;
                     Homebrew/uv installers; Antidote and Zsh plugins;
                     Powerlevel10k theme, gitstatusd and Zellij release binaries.
                     Package-manager installs and local config links are unaffected.
@@ -32,7 +33,7 @@ Examples:
   ./bootstrap.sh
   ./bootstrap.sh --config config/local.conf
   ./bootstrap.sh --non-interactive --modules dotfiles
-  ./bootstrap.sh --non-interactive --allow-remote --modules all --tools all
+  ./bootstrap.sh --config config/local.conf --non-interactive --allow-remote --modules all --tools all
   ./bootstrap.sh --non-interactive --modules dotfiles --conflict backup
 
 Command-line options override the selected config regardless of argument order.
@@ -42,6 +43,7 @@ EOF
 
 list_modules() {
     cat <<'EOF'
+clash      Enable Clash from a local YAML file; stop it when done (Linux only)
 base       Install git, curl, wget, vim, unzip and zsh
 homebrew   Install Homebrew when its host requirements are met
 zsh        Zsh Augmented: Antidote, completions, suggestions and highlighting
@@ -113,6 +115,7 @@ print_install_plan() {
     for module in $1; do
         case " $MODULES " in *" $module "*) ;; *) continue ;; esac
         case "$module" in
+            clash) printf '  clash: clashctl、Mihomo、yq（Linux；配置：%s）\n' "${CLASH_CONFIG_FILE:-未填写 [clash] config_file}" ;;
             base) printf '  base: git、curl、wget、vim、unzip、zsh\n' ;;
             homebrew) printf '  homebrew: Homebrew（不满足安装条件时跳过）\n' ;;
             zsh) printf '  zsh: Zsh Augmented · Antidote、补全、自动建议、语法高亮\n' ;;
@@ -134,18 +137,24 @@ print_install_plan() {
         log_info 'GitHub 下载：直连。'
     fi
     log_info "Git 下载超时：${GIT_TIMEOUT} 秒"
-    log_info '上游下载授权范围：Homebrew/uv 安装脚本；Antidote 与 Zsh 补全、自动建议、语法高亮插件；Powerlevel10k 主题、gitstatusd 和 Zellij 发布包。'
+    log_info '上游下载授权范围：clashctl 及其 Mihomo/yq 组件；Homebrew/uv 安装脚本；Antidote 与 Zsh 补全、自动建议、语法高亮插件；Powerlevel10k 主题、gitstatusd 和 Zellij 发布包。'
     if [[ "$ALLOW_REMOTE" == 1 ]]; then
         log_info '上述内容：已授权直接下载并执行或加载。'
     else
         log_info '上述内容：未预先授权；交互时确认来源，非交互时跳过对应的直接下载安装步骤。'
     fi
     log_info '包管理器安装、本地配置部署不受此授权限制；已安装的组件仍可复用。'
+    case " $MODULES " in
+        *' clash '*)
+            log_info 'Linux 上先启用 Clash，成功后取消 GitHub 加速前缀，安装结束时关闭内核。'
+            log_info '配置缺失、未授权安装或代理连接失败时停止后续安装；macOS 跳过 Clash。'
+            ;;
+    esac
 }
 
 print_install_summary() {
     local elapsed=$1 index item state completed=0 partial=0 skipped=0 failures=0
-    local retry_modules='' zsh_config_ready=0 git_config_ready=0
+    local retry_modules='' zsh_config_ready=0 git_config_ready=0 clash_failed=0
     for ((index=0; index<MODULE_COUNT; index++)); do
         case "${MODULE_STATES[$index]}" in
             complete) completed=$((completed + 1)) ;;
@@ -174,6 +183,7 @@ print_install_summary() {
         case "$state" in
             partial|failed) retry_modules="${retry_modules:+$retry_modules,}${MODULE_IDS[$index]}" ;;
         esac
+        if [[ "${MODULE_IDS[$index]}" == clash && "$state" == failed ]]; then clash_failed=1; fi
     done
     for ((item=0; item<RESULT_COUNT; item++)); do
         case "${RESULT_STATES[$item]}" in ready|configured) ;; *) continue ;; esac
@@ -194,6 +204,11 @@ print_install_summary() {
         fi
     fi
     if [[ -n "$retry_modules" ]]; then
+        if [[ "$clash_failed" == 1 ]]; then
+            retry_modules=${MODULES// /,}
+        elif [[ "$OS" == linux && " $MODULES " == *' clash '* ]]; then
+            retry_modules="clash,$retry_modules"
+        fi
         local config_path=$CONFIG_FILE
         [[ "$config_path" == /* ]] || config_path="$PWD/$config_path"
         printf '\n处理上述问题后，可按本次选项重试相关模块：\n  bash %q --config %q --modules %q' \
@@ -231,8 +246,8 @@ main() {
     case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
     detect_system || return 1
     local module answer result failed=0 total=0 started module_started first item successful pending errors state elapsed
-    local execution_order='base homebrew zsh powerlevel10k tools dotfiles shell'
-    if [ "$OS" = macos ]; then execution_order='homebrew base zsh powerlevel10k tools dotfiles shell'; fi
+    local execution_order='clash base homebrew zsh powerlevel10k tools dotfiles shell'
+    if [ "$OS" = macos ]; then execution_order='clash homebrew base zsh powerlevel10k tools dotfiles shell'; fi
     printf '\n'
     print_styled '1;36' 'oh-my-devboom'
     printf '\n开发环境初始化\n\n环境    %s / %s / %s · uid=%s · 包管理器=%s · 容器=%s\n' \
@@ -294,12 +309,35 @@ main() {
             print_status "$state"
             printf ' %s · %ss\n' "$(module_label "$module")" "$elapsed"
         } >&2
+        if [[ "$module" == clash && "$OS" == linux && "$state" != complete ]]; then
+            MODULE_STATES[$((MODULE_COUNT - 1))]=failed
+            failed=1
+            log_error 'Clash 尚未就绪，后续模块未执行。修复后重跑，或在配置中关闭 clash。'
+            break
+        fi
     done
+    if [[ -n "${CLASH_CLEANUP_HOME:-}" ]]; then
+        if ! cleanup_clash; then
+            failed=1
+            for ((item=0; item<MODULE_COUNT; item++)); do
+                [[ "${MODULE_IDS[$item]}" != clash ]] || MODULE_STATES[$item]=failed
+            done
+        fi
+    fi
     CURRENT_MODULE=''
     print_install_summary "$((SECONDS - started))" >&2
     return "$failed"
 }
 
 if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
+    CLASH_CLEANUP_HOME=''
+    trap 'status=$?; trap - EXIT; trap "" HUP INT TERM
+        if [[ -n "$CLASH_CLEANUP_HOME" ]] && ! cleanup_clash; then
+            [[ "$status" != 0 ]] || status=1
+        fi
+        exit "$status"' EXIT
+    trap 'exit 129' HUP
+    trap 'exit 130' INT
+    trap 'exit 143' TERM
     main "$@"
 fi
