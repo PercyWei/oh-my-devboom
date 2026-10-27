@@ -1,0 +1,10 @@
+[init]
+	defaultBranch = main
+[fetch]
+	prune = true
+[color]
+	ui = auto
+[core]
+	quotepath = false
+[include]
+	path = ~/.gitconfig.local

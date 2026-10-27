@@ -1,0 +1,89 @@
+# oh-my-devboom：通过 bootstrap.sh --modules dotfiles 部署。
+typeset -g GITSTATUS_AUTO_INSTALL=0
+typeset -g GITSTATUS_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/oh-my-devboom/gitstatus"
+# instant prompt 需要在其余初始化代码之前加载。
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+    source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
+fi
+
+export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
+export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+
+# Zsh 的 path 数组自动同步 PATH；-U 避免重复加入同一路径。
+typeset -U path fpath
+path=("$HOME/.local/bin" $path)
+for _devboom_brew in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew "$HOME/.linuxbrew/bin/brew"; do
+    if [[ -x "$_devboom_brew" && $EUID != 0 ]]; then
+        eval "$("$_devboom_brew" shellenv)"
+        break
+    fi
+done
+unset _devboom_brew
+
+export EDITOR="${EDITOR:-vim}"
+export VISUAL="${VISUAL:-$EDITOR}"
+export ANTIDOTE_HOME="$XDG_DATA_HOME/oh-my-devboom/plugins"
+
+mkdir -p "$XDG_DATA_HOME/oh-my-devboom" "$XDG_CACHE_HOME/oh-my-devboom"
+HISTFILE="$XDG_DATA_HOME/oh-my-devboom/zsh_history"
+HISTSIZE=10000
+SAVEHIST=10000
+setopt AUTO_CD EXTENDED_HISTORY HIST_IGNORE_DUPS HIST_REDUCE_BLANKS SHARE_HISTORY
+bindkey -e
+
+alias ll='ls -lh'
+alias la='ls -lah'
+if (( $+commands[eza] )); then
+    alias ll='eza -lh --group-directories-first'
+    alias la='eza -lah --group-directories-first'
+fi
+if ! (( $+commands[bat] )) && (( $+commands[batcat] )); then
+    alias bat=batcat
+fi
+if ! (( $+commands[fd] )) && (( $+commands[fdfind] )); then
+    alias fd=fdfind
+fi
+
+# 插件列表中 completion 的 post hook 在补全路径设置后运行。
+# 先初始化 widgets，再加载 autosuggestions 和 syntax-highlighting。
+typeset -g _devboom_shell_initialized=0
+_devboom_init_completion() {
+    autoload -Uz compinit
+    compinit -i -d "$XDG_CACHE_HOME/oh-my-devboom/zcompdump"
+    zstyle ':completion:*' menu select
+    if (( $+commands[fzf] )); then
+        local fzf_init
+        if fzf_init="$(fzf --zsh 2>/dev/null)"; then
+            eval "$fzf_init"
+        elif [[ -r /usr/share/doc/fzf/examples/completion.zsh &&
+                -r /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
+            source /usr/share/doc/fzf/examples/completion.zsh
+            source /usr/share/doc/fzf/examples/key-bindings.zsh
+        else
+            print -u2 -- '[warn] fzf 不支持 --zsh，且未找到系统集成脚本；请升级 fzf 以启用补全和快捷键。'
+        fi
+    fi
+    if (( $+commands[zoxide] )); then
+        eval "$(zoxide init zsh)"
+    fi
+    _devboom_shell_initialized=1
+}
+
+# 仅加载已生成的静态文件；启动 Shell 时不下载或执行远程安装器。
+if [[ -r "$XDG_CACHE_HOME/oh-my-devboom/zsh_plugins.zsh" ]]; then
+    source "$XDG_CACHE_HOME/oh-my-devboom/zsh_plugins.zsh"
+fi
+# 系统可能已经定义 compdef；仍需执行本项目的工具初始化。
+(( _devboom_shell_initialized )) || _devboom_init_completion
+unset _devboom_shell_initialized
+unfunction _devboom_init_completion
+
+# 主题与预设分别管理；启动时只使用已安装的本地文件。
+if [[ -r "$XDG_DATA_HOME/oh-my-devboom/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
+    typeset -g POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
+    source "$XDG_DATA_HOME/oh-my-devboom/powerlevel10k/powerlevel10k.zsh-theme"
+    [[ ! -r "${ZDOTDIR:-$HOME}/.p10k.zsh" ]] || source "${ZDOTDIR:-$HOME}/.p10k.zsh"
+else
+    PROMPT='%n@%m:%~%# '
+fi

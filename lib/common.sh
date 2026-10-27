@@ -1,0 +1,90 @@
+#!/usr/bin/env bash
+
+log_info() { printf '[info] %s\n' "$*"; }
+log_warn() { printf '[warn] %s\n' "$*" >&2; }
+log_error() { printf '[error] %s\n' "$*" >&2; }
+have() { command -v "$1" >/dev/null 2>&1; }
+
+# Bound Git and Antidote's child Git processes without requiring GNU timeout.
+run_git_download() (
+    local download_pid='' timer_pid='' helper_pid pid
+    local -x GIT_TERMINAL_PROMPT=0 GIT_HTTP_LOW_SPEED_LIMIT=1 GIT_HTTP_LOW_SPEED_TIME=30
+    helper_pid=$(exec /bin/sh -c 'printf "%s\n" "$PPID"')
+    trap '
+        trap "" HUP INT TERM ALRM
+        for pid in $download_pid $timer_pid; do
+            kill -TERM -- "-$pid" 2>/dev/null || :
+        done
+        sleep 1
+        for pid in $download_pid $timer_pid; do
+            kill -KILL -- "-$pid" 2>/dev/null || :
+            wait "$pid" 2>/dev/null || :
+        done
+    ' EXIT
+    trap 'exit 1' HUP INT TERM
+    trap 'log_error "Git download timed out after 120 seconds; check network or proxy access."; exit 1' ALRM
+    # Separate process groups let cleanup include grandchildren, not just git itself.
+    set -m
+    "$@" &
+    download_pid=$!
+    (
+        trap - EXIT HUP INT TERM ALRM
+        set +m
+        sleep 120
+        kill -ALRM "$helper_pid" 2>/dev/null || :
+    ) &
+    timer_pid=$!
+    set +m
+    wait "$download_pid" 2>/dev/null || return 1
+)
+
+download_file() {
+    if have curl; then
+        curl --fail --location --proto '=https' --tlsv1.2 \
+            --connect-timeout 15 --max-time 300 --retry 2 --retry-max-time 300 \
+            --output "$2" "$1" || { log_error "Download failed or timed out: $1"; return 1; }
+    elif have wget; then
+        # -T/-t also work with BusyBox wget (-t is ignored there; it does not retry).
+        wget -T 30 -t 3 -O "$2" "$1" || { log_error "Download failed or timed out: $1"; return 1; }
+    else
+        log_warn 'Download requires curl or wget; select the base module first.'
+        return 2
+    fi
+}
+
+approve_remote() {
+    local label=$1 source_url=$2 answer
+    log_info "$label source: $source_url"
+    if [ "$ALLOW_REMOTE" -eq 1 ]; then return 0; fi
+    if [ "$INTERACTIVE" -eq 0 ]; then
+        log_warn "$label skipped: remote code requires --allow-remote."
+        return 2
+    fi
+    printf 'Authorize remote code for %s? [y/N] ' "$label"
+    IFS= read -r answer || return 2
+    case "$answer" in y|Y|yes|YES) return 0 ;; *) log_warn "$label skipped."; return 2 ;; esac
+}
+
+run_remote_installer() {
+    local label=$1 source_url=$2 installer checksum result=0
+    shift 2
+    if [ "$INTERACTIVE" -eq 0 ] && [ "$ALLOW_REMOTE" -eq 0 ]; then
+        approve_remote "$label" "$source_url"
+        return $?
+    fi
+    mkdir -p "$XDG_CACHE_HOME/oh-my-devboom" || return 1
+    installer=$(mktemp "$XDG_CACHE_HOME/oh-my-devboom/installer.XXXXXX") || return 1
+    download_file "$source_url" "$installer" || { result=$?; rm -f "$installer"; return "$result"; }
+    log_info "Review $label installer: $installer"
+    if have sha256sum; then
+        checksum=$(sha256sum "$installer") || return 1
+        log_info "SHA256: ${checksum%% *}"
+    elif have shasum; then
+        checksum=$(shasum -a 256 "$installer") || return 1
+        log_info "SHA256: ${checksum%% *}"
+    else
+        log_warn 'No SHA256 utility available; review the downloaded file before approval.'
+    fi
+    approve_remote "$label" "$source_url" || return $?
+    /bin/bash "$installer" "$@" || return 1
+}

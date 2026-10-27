@@ -1,0 +1,24 @@
+name: Check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  shell:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Bash syntax
+        run: git ls-files -z '*.sh' | xargs -0 -n 1 /bin/bash -n
+      - name: Check Zsh syntax
+        if: runner.os == 'macOS'
+        run: /bin/zsh -n config/zsh/zshrc && /bin/zsh -n config/powerlevel10k/p10k.zsh
+      - name: Run isolated tests
+        run: /bin/bash tests/run.sh
