@@ -268,6 +268,12 @@ RELEASE
         backups=("$HOME/existing.backup."*)
         assert_equal 1 "${#backups[@]}" 'Repeated deployment creates no new backup'
 
+        mkdir -p "$XDG_DATA_HOME/oh-my-devboom/powerlevel10k" "$XDG_CACHE_HOME/oh-my-devboom/gitstatus"
+        printf '# theme fixture\n' > "$XDG_DATA_HOME/oh-my-devboom/powerlevel10k/powerlevel10k.zsh-theme"
+        for platform in linux-x86_64 linux-aarch64 darwin-x86_64 darwin-arm64; do
+            printf '#!/bin/sh\nexit 99\n' > "$XDG_CACHE_HOME/oh-my-devboom/gitstatus/gitstatusd-$platform"
+            chmod +x "$XDG_CACHE_HOME/oh-my-devboom/gitstatus/gitstatusd-$platform"
+        done
         "$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --modules dotfiles --non-interactive > "$TEST_ROOT/first-run.log" 2>&1 || { cat "$TEST_ROOT/first-run.log" >&2; fail 'First dotfiles run failed'; }
         "$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --modules dotfiles --non-interactive > "$TEST_ROOT/second-run.log" 2>&1 || { cat "$TEST_ROOT/second-run.log" >&2; fail 'Second dotfiles run failed'; }
         [[ -f "$HOME/.zshrc" && ! -L "$HOME/.zshrc" ]] || fail 'Dotfiles module did not copy .zshrc'
@@ -576,7 +582,10 @@ FIXTURE
         package_owner=fzf
         fzf() {
             case "$1" in
-                --zsh) [[ "$fzf_mode" == modern ]] ;;
+                --zsh)
+                    [[ "$fzf_mode" == modern ]] || return 2
+                    printf '# modern integration fixture\n'
+                    ;;
                 --version) printf '0.44.1 (debian)\n' ;;
                 *) fail "Unexpected fzf invocation: $*" ;;
             esac
@@ -603,17 +612,16 @@ FIXTURE
         target="$XDG_DATA_HOME/oh-my-devboom/fzf"
         module_tools
         assert_equal '0.44.1 (debian)' "$(cat "$target/fzf-version")" 'Runtime records the actual fzf version'
-        for script in completion.zsh key-bindings.zsh; do
-            cmp "$TEST_ROOT/package-scripts/$script" "$target/$script" || fail 'Matching package scripts were not deployed'
-        done
+        [[ $(cat "$target/init.zsh") == *'# completion fixture'*'# key bindings fixture'* ]] || fail 'Matching package scripts were not combined in load order'
         downloaded=$(cat "$TEST_ROOT/apt.log")
         module_tools
         assert_equal "$downloaded" "$(cat "$TEST_ROOT/apt.log")" 'Repeated preparation must not download again'
         mv "$target" "$TEST_ROOT/prepared-fzf"
         fzf_mode=modern
         module_tools
-        [[ ! -e "$target" ]] || fail 'Modern fzf does not need a runtime script cache'
+        assert_equal '# modern integration fixture' "$(cat "$target/init.zsh")" 'Modern fzf integration is prepared at installation'
         assert_equal "$downloaded" "$(cat "$TEST_ROOT/apt.log")" 'Modern fzf must not download scripts'
+        mv "$target" "$TEST_ROOT/prepared-modern-fzf"
 
         fzf_mode=old
         mkdir -p "$target"
@@ -652,8 +660,11 @@ FIXTURE
             printf 'SKIP: shell integration checks require zsh\n'
             exit 0
         fi
-        mkdir -p "$TEST_ROOT/fzf" "$XDG_CACHE_HOME/oh-my-devboom"
-        # Executables satisfy command detection; Zsh functions below mock their output.
+        mkdir -p "$TEST_ROOT/fzf" "$XDG_CACHE_HOME/oh-my-devboom" "$XDG_CONFIG_HOME/oh-my-devboom/zsh"
+        for fragment in fzf zoxide plugins; do
+            cp "$REPO_ROOT/config/zsh/modules/$fragment.zsh" "$XDG_CONFIG_HOME/oh-my-devboom/zsh/"
+        done
+        # Executables satisfy command detection; startup must not execute fzf.
         for tool in fzf zoxide; do
             printf '#!/bin/sh\nexit 99\n' > "$TEST_ROOT/bin/$tool"
             chmod +x "$TEST_ROOT/bin/$tool"
@@ -684,20 +695,15 @@ autoload -Uz compinit
 compinit -i -d "$fixture/system-zcompdump"
 typeset -gi fzf_init_calls=0 zoxide_init_calls=0
 fzf() {
-    if [[ $1 == --version ]]; then
-        print -r -- '0.44.1 (debian)'
-        return 0
-    fi
-    [[ $scenario == modern ]] || return 2
-    print -r -- "source '$fixture/fzf/completion.zsh'"
-    print -r -- "source '$fixture/fzf/key-bindings.zsh'"
+    print -u2 -- "Unexpected fzf startup invocation: $*"
+    return 1
 }
 zoxide() {
     print -r -- '(( ++zoxide_init_calls )); z() { :; }; zi() { :; }'
 }
 source "$fixture/zshrc"
 [[ $+functions[z] == 1 && $+functions[zi] == 1 && $zoxide_init_calls == 1 ]]
-if [[ $scenario != missing_scripts && $scenario != version_mismatch ]]; then
+if [[ $scenario != missing_scripts ]]; then
     [[ $fzf_init_calls == 1 ]]
     [[ $(bindkey '^R') == *fzf-history-widget ]]
     [[ $(bindkey '^T') == *fzf-file-widget ]]
@@ -713,11 +719,12 @@ ZSH
         for scenario in modern old missing_scripts version_mismatch bundle; do
             rm -rf "$fzf_dir"
             case "$scenario" in
-                old|version_mismatch|bundle)
+                modern|old|version_mismatch|bundle)
                     mkdir -p "$fzf_dir"
-                    cp "$TEST_ROOT/fzf/"* "$fzf_dir/"
+                    cat "$TEST_ROOT/fzf/completion.zsh" "$TEST_ROOT/fzf/key-bindings.zsh" > "$fzf_dir/init.zsh"
                     printf '0.44.1 (debian)\n' > "$fzf_dir/fzf-version"
                     if [[ "$scenario" == version_mismatch ]]; then
+                        # Version checks belong to installation, not Shell startup.
                         printf '0.43.0 (debian)\n' > "$fzf_dir/fzf-version"
                     fi
                     ;;
@@ -733,8 +740,8 @@ ZSH
                 cat "$TEST_ROOT/shell.log" >&2
                 fail "Shell integration: $scenario"
             }
-            if [[ "$scenario" == missing_scripts || "$scenario" == version_mismatch ]]; then
-                [[ $(cat "$TEST_ROOT/shell.log") == *'bootstrap.sh --non-interactive --modules tools --tools fzf'* ]] || fail 'Missing or outdated fzf integration is silent'
+            if [[ "$scenario" == missing_scripts ]]; then
+                [[ $(cat "$TEST_ROOT/shell.log") == *'bootstrap.sh --non-interactive --modules tools --tools fzf'* ]] || fail 'Missing fzf integration is silent'
             else
                 [[ ! -s "$TEST_ROOT/shell.log" ]] || { cat "$TEST_ROOT/shell.log" >&2; fail 'Unexpected shell startup output'; }
             fi

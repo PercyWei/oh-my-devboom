@@ -49,7 +49,7 @@ homebrew   Install Homebrew when its host requirements are met
 zsh        Zsh Augmented: Antidote, completions, suggestions and highlighting
 powerlevel10k Install the Powerlevel10k Zsh prompt
 tools      Install selected optional developer tools
-dotfiles   Copy Zsh, Git, Powerlevel10k and plugin configuration
+dotfiles   Copy base configuration and settings for available components
 shell      Set the current account's login shell to Zsh
 EOF
 }
@@ -121,7 +121,7 @@ print_install_plan() {
             zsh) printf '  zsh: Zsh Augmented · Antidote、补全、自动建议、语法高亮\n' ;;
             powerlevel10k) printf '  powerlevel10k: Powerlevel10k、gitstatusd\n' ;;
             tools) printf '  tools: %s\n' "${TOOLS:-未选择工具}" ;;
-            dotfiles) printf '  dotfiles: 部署 Shell / Git / 主题配置及插件列表\n' ;;
+            dotfiles) printf '  dotfiles: 基础配置及已就绪组件的配置片段\n' ;;
             shell) printf '  shell: 将当前执行账户的默认登录 Shell 设为 Zsh（chsh）\n' ;;
         esac
     done

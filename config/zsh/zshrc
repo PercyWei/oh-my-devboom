@@ -1,39 +1,18 @@
 # oh-my-devboom：通过 bootstrap.sh --modules dotfiles 部署。
-typeset -g GITSTATUS_AUTO_INSTALL=0
-typeset -g GITSTATUS_CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/oh-my-devboom/gitstatus"
-# instant prompt 需要在其余初始化代码之前加载。
-if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
-    source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
-fi
-
 export XDG_CONFIG_HOME="${XDG_CONFIG_HOME:-$HOME/.config}"
 export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$HOME/.cache}"
 export XDG_DATA_HOME="${XDG_DATA_HOME:-$HOME/.local/share}"
+_devboom_zsh_dir="$XDG_CONFIG_HOME/oh-my-devboom/zsh"
 
-# 提供 clashctl 命令；新终端按需运行 clashctl on 启用代理。
-_devboom_clash_home="$XDG_DATA_HOME/clashctl"
-if [[ -r "$_devboom_clash_home/scripts/cmd/clashctl.sh" &&
-      -r "$_devboom_clash_home/.clashctl-format" &&
-      "$(<"$_devboom_clash_home/.clashctl-format")" == 1 ]]; then
-    export CLASHCTL_HOME="${_devboom_clash_home:A}"
-    source "$CLASHCTL_HOME/scripts/cmd/clashctl.sh"
+# 即时提示在其余初始化之前加载。
+if [[ -r "$_devboom_zsh_dir/powerlevel10k-instant.zsh" ]]; then
+    source "$_devboom_zsh_dir/powerlevel10k-instant.zsh"
 fi
-unset _devboom_clash_home
 
-# Zsh 的 path 数组自动同步 PATH；-U 避免重复加入同一路径。
 typeset -U path fpath
 path=("$HOME/.local/bin" $path)
-for _devboom_brew in /opt/homebrew/bin/brew /usr/local/bin/brew /home/linuxbrew/.linuxbrew/bin/brew "$HOME/.linuxbrew/bin/brew"; do
-    if [[ -x "$_devboom_brew" && $EUID != 0 ]]; then
-        eval "$("$_devboom_brew" shellenv)"
-        break
-    fi
-done
-unset _devboom_brew
-
 export EDITOR="${EDITOR:-vim}"
 export VISUAL="${VISUAL:-$EDITOR}"
-export ANTIDOTE_HOME="$XDG_DATA_HOME/oh-my-devboom/plugins"
 
 mkdir -p "$XDG_DATA_HOME/oh-my-devboom" "$XDG_CACHE_HOME/oh-my-devboom"
 HISTFILE="$XDG_DATA_HOME/oh-my-devboom/zsh_history"
@@ -44,56 +23,38 @@ bindkey -e
 
 alias ll='ls -lh'
 alias la='ls -lah'
-if (( $+commands[eza] )); then
-    alias ll='eza -lh --group-directories-first'
-    alias la='eza -lah --group-directories-first'
-fi
-if ! (( $+commands[bat] )) && (( $+commands[batcat] )); then
-    alias bat=batcat
-fi
-if ! (( $+commands[fd] )) && (( $+commands[fdfind] )); then
-    alias fd=fdfind
-fi
+PROMPT='%n@%m:%~%# '
 
-# 插件列表中 completion 的 post hook 在补全路径设置后运行。
-# 先初始化 widgets，再加载 autosuggestions 和 syntax-highlighting。
+for _devboom_module in homebrew clash eza bat fd; do
+    if [[ -r "$_devboom_zsh_dir/$_devboom_module.zsh" ]]; then
+        source "$_devboom_zsh_dir/$_devboom_module.zsh"
+    fi
+done
+
+# Antidote 在补全路径准备好后调用此函数，先初始化 widgets 再加载后续插件。
 typeset -g _devboom_shell_initialized=0
 _devboom_init_completion() {
+    local module
     autoload -Uz compinit
     compinit -i -d "$XDG_CACHE_HOME/oh-my-devboom/zcompdump"
     zstyle ':completion:*' menu select
-    if (( $+commands[fzf] )); then
-        local fzf_init fzf_dir="$XDG_DATA_HOME/oh-my-devboom/fzf"
-        if fzf_init="$(fzf --zsh 2>/dev/null)"; then
-            eval "$fzf_init"
-        elif [[ -r "$fzf_dir/fzf-version" && "$(<"$fzf_dir/fzf-version")" == "$(fzf --version)" &&
-                -r "$fzf_dir/completion.zsh" && -r "$fzf_dir/key-bindings.zsh" ]]; then
-            source "$fzf_dir/completion.zsh"
-            source "$fzf_dir/key-bindings.zsh"
-        else
-            print -u2 -- '[warn] fzf 的 Zsh 集成尚未准备；请运行 bootstrap.sh --non-interactive --modules tools --tools fzf。'
+    for module in fzf zoxide; do
+        if [[ -r "$_devboom_zsh_dir/$module.zsh" ]]; then
+            source "$_devboom_zsh_dir/$module.zsh"
         fi
-    fi
-    if (( $+commands[zoxide] )); then
-        eval "$(zoxide init zsh)"
-    fi
+    done
     _devboom_shell_initialized=1
 }
 
-# 仅加载已生成的静态文件；启动 Shell 时不下载或执行远程安装器。
-if [[ -r "$XDG_CACHE_HOME/oh-my-devboom/zsh_plugins.zsh" ]]; then
-    source "$XDG_CACHE_HOME/oh-my-devboom/zsh_plugins.zsh"
+if [[ -r "$_devboom_zsh_dir/plugins.zsh" ]]; then
+    source "$_devboom_zsh_dir/plugins.zsh"
 fi
-# 系统可能已经定义 compdef；仍需执行本项目的工具初始化。
+# 未安装插件或移除补全插件时，仍初始化基础补全和工具。
 (( _devboom_shell_initialized )) || _devboom_init_completion
 unset _devboom_shell_initialized
 unfunction _devboom_init_completion
 
-# 主题与预设分别管理；启动时只使用已安装的本地文件。
-if [[ -r "$XDG_DATA_HOME/oh-my-devboom/powerlevel10k/powerlevel10k.zsh-theme" ]]; then
-    typeset -g POWERLEVEL9K_DISABLE_CONFIGURATION_WIZARD=true
-    source "$XDG_DATA_HOME/oh-my-devboom/powerlevel10k/powerlevel10k.zsh-theme"
-    [[ ! -r "${ZDOTDIR:-$HOME}/.p10k.zsh" ]] || source "${ZDOTDIR:-$HOME}/.p10k.zsh"
-else
-    PROMPT='%n@%m:%~%# '
+if [[ -r "$_devboom_zsh_dir/powerlevel10k.zsh" ]]; then
+    source "$_devboom_zsh_dir/powerlevel10k.zsh"
 fi
+unset _devboom_zsh_dir _devboom_module

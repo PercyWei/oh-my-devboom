@@ -13,7 +13,7 @@
 | 包管理器 | Homebrew | `homebrew` |
 | Zsh Augmented | Antidote 插件管理器，以及 zsh-completions（补全）、zsh-autosuggestions（输入建议）、zsh-syntax-highlighting（语法高亮） | `zsh` |
 | Prompt | Powerlevel10k、gitstatusd Git 状态辅助程序及个人主题预设 | `powerlevel10k` |
-| 配置部署 | 将 Zsh 启动配置、插件列表、Git 通用配置和 Powerlevel10k 预设复制到用户目录 | `dotfiles` |
+| 配置部署 | 复制基础 Zsh、Git 配置，并按已安装组件部署 Zsh 片段、插件列表和主题预设 | `dotfiles` |
 | 默认 Shell | 将当前执行账户的登录 Shell 设为 Zsh | `shell` |
 
 以下开发工具默认启用，可在配置中逐项关闭，或用 `--tools` 指定：
@@ -128,7 +128,7 @@ modules/                  # 每个功能一个 Bash 模块
 config/
   default.conf            # 默认安装配置
   local.conf              # 个人安装配置（Git 忽略）
-  zsh/                    # .zshrc 与固定提交的插件列表
+  zsh/                    # 基础 .zshrc、modules/ 可选片段与固定提交的插件列表
   git/                    # 通用 Git 配置
   powerlevel10k/           # .p10k.zsh 主题预设
 tests/run.sh              # 基础测试
@@ -237,16 +237,21 @@ exec zsh
 
 程序配置位于 `config/`，复制到以下位置。`XDG_CONFIG_HOME` 默认为 `~/.config`。
 
-| 仓库文件 | 目标 |
-| --- | --- |
-| `config/zsh/zshrc` | `${ZDOTDIR:-$HOME}/.zshrc` |
-| `config/zsh/zsh_plugins.txt` | `$XDG_CONFIG_HOME/oh-my-devboom/zsh_plugins.txt` |
-| `config/git/gitconfig` | `~/.gitconfig` |
-| `config/powerlevel10k/p10k.zsh` | `${ZDOTDIR:-$HOME}/.p10k.zsh` |
+| 仓库文件 | 目标 | 部署条件 |
+| --- | --- | --- |
+| `config/zsh/zshrc` | `${ZDOTDIR:-$HOME}/.zshrc` | 始终部署 |
+| `config/git/gitconfig` | `~/.gitconfig` | 始终部署 |
+| `config/zsh/modules/*.zsh` | `$XDG_CONFIG_HOME/oh-my-devboom/zsh/` | 对应命令或安装文件已就绪 |
+| `config/zsh/zsh_plugins.txt` | `$XDG_CONFIG_HOME/oh-my-devboom/zsh_plugins.txt` | 已生成插件静态配置 |
+| `config/powerlevel10k/p10k.zsh` | `${ZDOTDIR:-$HOME}/.p10k.zsh` | 主题与 gitstatusd 已就绪 |
 
-直接编辑目标文件即可修改配置，Shell 配置需重新打开终端加载。更新仓库预设后，需重跑 `dotfiles` 模块部署。插件列表使用固定提交，修改后需重跑 `zsh` 模块生成静态配置。`dotfiles` 仅部署文件，插件和主题需启用对应安装模块。
+基础 `.zshrc` 保留 XDG、PATH、历史记录、基础别名、compinit 和片段加载。Homebrew、Clash、eza、batcat/fdfind 别名、fzf、zoxide、Antidote 和 Powerlevel10k 分别放在可选片段中。部署以实际安装状态为准，已有安装也可接入；缺失组件不新写对应片段，不会因本次未选择该模块而删除已有配置。组件后来被手动卸载时，片段通过轻量存在检查跳过加载。
 
-fzf 提供 Ctrl-R、Ctrl-T 和 Alt-C 快捷键，zoxide 提供 `z`、`zi` 目录跳转命令。新版 fzf 使用 `fzf --zsh` 初始化；Debian/Ubuntu 旧版所需脚本在安装时缓存到 `${XDG_DATA_HOME:-$HOME/.local/share}/oh-my-devboom/fzf`，仅加载与当前版本匹配的脚本。精简容器缺少这些脚本时，从 APT 仓库下载对应版本包提取；其他来源的旧版 fzf 需升级。
+直接编辑目标文件即可修改配置，Shell 配置需重新打开终端加载。安装新工具后，重跑 `dotfiles` 接入对应片段；已有 `.zshrc` 需用 `--conflict backup` 备份后更新，才能加载这些片段。插件列表使用固定提交，修改后需重跑 `zsh` 模块生成静态配置。组件未就绪时，已有文件软链接仍按下述规则保留内容并转换为普通文件。
+
+fzf 提供 Ctrl-R、Ctrl-T 和 Alt-C 快捷键，zoxide 提供 `z`、`zi` 目录跳转命令。安装时将 fzf 集成统一保存为 `${XDG_DATA_HOME:-$HOME/.local/share}/oh-my-devboom/fzf/init.zsh`，并记录对应版本：新版保存 `fzf --zsh` 输出；Debian/Ubuntu 旧版合并已安装包的补全和快捷键脚本，缺失时从 APT 提取相同版本；其他来源的旧版需升级。
+
+Zsh 启动时加载准备好的脚本，按补全路径、compinit、fzf/zoxide、自动建议和语法高亮的顺序初始化。Powerlevel10k 的即时提示在前部加载，主题和预设在末尾加载。
 
 Powerlevel10k 需要 Zsh 5.1+，安装在 `${XDG_DATA_HOME:-$HOME/.local/share}/oh-my-devboom/powerlevel10k`，预设从 `${ZDOTDIR:-$HOME}/.p10k.zsh` 加载。
 
@@ -346,8 +351,8 @@ Clash 的真实下载、配置导入和服务启动仍需在新 Linux 容器复�
 
 **插件或主题下载失败怎么办？** 检查日志中的下载地址和错误。Git 总时限可在所用配置的 `[options]` 中通过 `git_timeout` 调整；连接失败或 HTTP 低速超时仍需排查网络。启用 Clash 后使用原始 URL，经代理下载；未启用时默认经 ghfast.top 加速，可设置 `github_proxy=` 取消前缀。需要 Clash 时沿用原配置重跑：`bash bootstrap.sh --config config/local.conf --non-interactive --allow-remote --modules clash,zsh,powerlevel10k`；已有可用网络时去掉 `clash` 即绕过代理初始化。
 
-**fzf 已安装，但快捷键不可用？** 运行 `bash bootstrap.sh --non-interactive --modules tools --tools fzf` 绕过 Clash、补齐 Shell 集成，再重开 Zsh。Debian/Ubuntu 旧版脚本从系统包源获取，无需 `--allow-remote`；若源中已无对应版本，先用原包管理器升级 fzf。
+**fzf 已安装，但快捷键不可用？** 出现集成未准备提示，或从外部升级、更换 fzf 后，运行 `bash bootstrap.sh --non-interactive --modules tools --tools fzf` 生成或刷新集成脚本，再重跑 `dotfiles` 接入 fzf 片段并重开 Zsh。Debian/Ubuntu 旧版脚本从系统包源获取；若源中已无对应版本，先用原包管理器升级 fzf。已有 `.zshrc` 按[部署规则](#程序配置部署)备份后更新。
 
-**只安装 Prompt，不接管 Shell 配置？** 只选择 `powerlevel10k`，将 `config/powerlevel10k/p10k.zsh` 复制到 `${ZDOTDIR:-$HOME}/.p10k.zsh`，再参照 `config/zsh/zshrc`，把 instant prompt 和主题、预设的加载语句加入自己的 `.zshrc`。
+**只安装 Prompt，不接管 Shell 配置？** 只选择 `powerlevel10k`，将 `config/powerlevel10k/p10k.zsh` 复制到 `${ZDOTDIR:-$HOME}/.p10k.zsh`，再参照 `config/zsh/modules/` 中的 Powerlevel10k 片段，把即时提示和主题、预设的加载语句加入自己的 `.zshrc`。
 
 **如何更新配置或工具？** 更新仓库后重跑所需模块；部署不同的配置内容需使用 `--conflict backup`，否则保留当前文件。工具升级使用原包管理器或工具自身的更新命令。

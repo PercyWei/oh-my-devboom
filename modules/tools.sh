@@ -89,11 +89,6 @@ install_zellij() {
 }
 
 prepare_fzf_shell_integration() {
-    # Recent fzf embeds its own integration; never upgrade an existing binary.
-    if fzf --zsh >/dev/null 2>&1; then
-        record_result ready 'fzf Zsh 集成' '当前 fzf 内置补全和 Ctrl-R / Ctrl-T / Alt-C 快捷键支持。'
-        return 0
-    fi
     local target="$XDG_DATA_HOME/oh-my-devboom/fzf" version fzf_path package_version
     local scripts=/usr/share/doc/fzf/examples staging='' result=0 archives
     version=$(fzf --version) || {
@@ -106,21 +101,15 @@ prepare_fzf_shell_integration() {
         return 2
     fi
     if [[ -r "$target/fzf-version" && "$(cat "$target/fzf-version")" == "$version" &&
-          -r "$target/completion.zsh" && -r "$target/key-bindings.zsh" ]]; then
-        record_result ready 'fzf Zsh 集成' "复用与 fzf $version 匹配的补全和快捷键脚本：$target"
+          -r "$target/init.zsh" ]]; then
+        record_result ready 'fzf Zsh 集成' "复用与 fzf $version 匹配的初始化脚本：$target/init.zsh"
         return 0
     fi
-    fzf_path=$(command -v fzf)
-    if ! have apt-get || ! have dpkg-query || ! have dpkg-deb ||
-        [[ "$(dpkg-query -S "$fzf_path" 2>/dev/null)" != "fzf: $fzf_path" ]]; then
-        record_result skipped 'fzf Zsh 集成' '当前旧版 fzf 无法通过 APT 提取匹配的集成脚本。' \
-            '将 fzf 升级到支持 --zsh 的版本，以启用补全和快捷键。'
-        return 2
-    fi
-    package_version=$(dpkg-query -W -f='${Version}' fzf) || {
-        record_result failed 'fzf Zsh 集成' '无法读取已安装 fzf 的 APT 包版本。'
+    # 启动时不再检查版本；刷新失败时也不能继续加载已过期的脚本。
+    if ! rm -f "$target/init.zsh"; then
+        record_result failed 'fzf Zsh 集成' "无法清除旧初始化脚本：$target/init.zsh" '检查目录权限后重试。'
         return 1
-    }
+    fi
     mkdir -p "$XDG_DATA_HOME/oh-my-devboom" || {
         record_result failed 'fzf Zsh 集成' "无法创建数据目录：$XDG_DATA_HOME/oh-my-devboom" \
             '检查目录权限及磁盘空间后重试。'
@@ -130,37 +119,62 @@ prepare_fzf_shell_integration() {
         record_result failed 'fzf Zsh 集成' "无法在 $XDG_DATA_HOME/oh-my-devboom 创建临时目录。"
         return 1
     }
-    if [[ ! -r "$scripts/completion.zsh" || ! -r "$scripts/key-bindings.zsh" ]]; then
-        # Extract the exact installed package, bypassing only doc-file exclusion.
-        # APT keeps its configured repository authentication and hash checks.
-        log_info "从 APT 仓库下载 fzf=${package_version}，提取匹配的 Zsh 集成脚本。"
-        if (cd "$staging" && apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 \
-            download "fzf=$package_version"); then
-            archives=("$staging"/*.deb)
-            dpkg-deb -x "${archives[0]}" "$staging/package" || {
-                record_result failed 'fzf Zsh 集成' "无法解压 fzf=$package_version 的 APT 包。" \
-                    '检查上方 dpkg-deb 错误及磁盘空间后重试。'
+    mkdir "$staging/runtime" || {
+        rm -rf -- "$staging"
+        record_result failed 'fzf Zsh 集成' '无法创建初始化脚本临时目录。' '检查目录权限和磁盘空间后重试。'
+        return 1
+    }
+    # 新版导出脚本；旧版从原包提取。两者使用相同的启动入口。
+    if ! fzf --zsh > "$staging/runtime/init.zsh" 2>/dev/null; then
+        fzf_path=$(command -v fzf)
+        if ! have apt-get || ! have dpkg-query || ! have dpkg-deb ||
+            [[ "$(dpkg-query -S "$fzf_path" 2>/dev/null)" != "fzf: $fzf_path" ]]; then
+            rm -rf -- "$staging"
+            record_result skipped 'fzf Zsh 集成' '当前旧版 fzf 无法通过 APT 提取匹配的集成脚本。' \
+                '将 fzf 升级到支持 --zsh 的版本，以启用补全和快捷键。'
+            return 2
+        fi
+        package_version=$(dpkg-query -W -f='${Version}' fzf) || {
+            rm -rf -- "$staging"
+            record_result failed 'fzf Zsh 集成' '无法读取已安装 fzf 的 APT 包版本。'
+            return 1
+        }
+        if [[ ! -r "$scripts/completion.zsh" || ! -r "$scripts/key-bindings.zsh" ]]; then
+            # APT 校验来源并提取已安装版本，补齐精简容器缺失的文档文件。
+            log_info "从 APT 仓库下载 fzf=${package_version}，提取匹配的 Zsh 集成脚本。"
+            if (cd "$staging" && apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 \
+                download "fzf=$package_version"); then
+                archives=("$staging"/*.deb)
+                dpkg-deb -x "${archives[0]}" "$staging/package" || {
+                    record_result failed 'fzf Zsh 集成' "无法解压 fzf=$package_version 的 APT 包。" \
+                        '检查上方 dpkg-deb 错误及磁盘空间后重试。'
+                    result=1
+                }
+                scripts="$staging/package/usr/share/doc/fzf/examples"
+            else
+                record_result failed 'fzf Zsh 集成' "无法从 APT 仓库下载已安装版本 fzf=${package_version}。" \
+                    '检查 APT 仓库是否仍提供该版本，以及网络连接后重试。'
                 result=1
-            }
-            scripts="$staging/package/usr/share/doc/fzf/examples"
-        else
-            record_result failed 'fzf Zsh 集成' "无法从 APT 仓库下载已安装版本 fzf=${package_version}。" \
-                '检查 APT 仓库是否仍提供该版本，以及网络连接后重试。'
-            result=1
+            fi
+        fi
+        if [[ "$result" == 0 ]]; then
+            { cat "$scripts/completion.zsh" && printf '\n' && cat "$scripts/key-bindings.zsh"; } \
+                > "$staging/runtime/init.zsh" || {
+                    record_result failed 'fzf Zsh 集成' "无法从 $scripts 准备匹配版本的补全和快捷键脚本。" \
+                        '检查脚本是否完整，以及目录权限和磁盘空间后重试。'
+                    result=1
+                }
         fi
     fi
     if [[ "$result" == 0 ]]; then
-        mkdir "$staging/runtime" &&
-            cp "$scripts/completion.zsh" "$scripts/key-bindings.zsh" "$staging/runtime/" &&
-            printf '%s\n' "$version" > "$staging/runtime/fzf-version" || {
-                record_result failed 'fzf Zsh 集成' "无法从 $scripts 准备匹配版本的补全和快捷键脚本。" \
-                    '检查脚本是否完整，以及目录权限和磁盘空间后重试。'
-                result=1
-            }
+        printf '%s\n' "$version" > "$staging/runtime/fzf-version" || {
+            record_result failed 'fzf Zsh 集成' '无法记录初始化脚本对应的 fzf 版本。' '检查目录权限和磁盘空间后重试。'
+            result=1
+        }
     fi
     if [[ "$result" == 0 ]]; then
         if [[ -d "$target" ]]; then
-            mv "$staging/runtime/completion.zsh" "$staging/runtime/key-bindings.zsh" "$target/" &&
+            mv "$staging/runtime/init.zsh" "$target/init.zsh" &&
                 mv "$staging/runtime/fzf-version" "$target/fzf-version" || result=1
         else
             # Publish a complete directory on the same filesystem on first install.
@@ -173,7 +187,7 @@ prepare_fzf_shell_integration() {
     fi
     rm -rf -- "$staging"
     if [[ "$result" == 0 ]]; then
-        record_result configured 'fzf Zsh 集成' "已部署与 fzf $version 匹配的补全和快捷键脚本：$target"
+        record_result configured 'fzf Zsh 集成' "已部署与 fzf $version 匹配的初始化脚本：$target/init.zsh"
     fi
     return "$result"
 }
