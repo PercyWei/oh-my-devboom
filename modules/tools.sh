@@ -9,7 +9,7 @@ install_zellij() {
         ensure_packages zellij
         return $?
     fi
-    local target sha256 url staging checksum result=0
+    local target sha256 url staging checksum result=0 RECORD_PACKAGE_RESULTS=0
     case "$OS:$ARCH" in
         linux:x86_64)
             target=x86_64-unknown-linux-musl
@@ -23,67 +23,113 @@ install_zellij() {
         macos:aarch64)
             target=aarch64-apple-darwin
             sha256=c029ba4fe1927b79ad9f0cdd59155c4dff80777863c85857d4d09b88b56f9891 ;;
-        *) log_warn "Zellij 发布包不支持当前平台：$OS/$ARCH"; return 2 ;;
+        *) record_result skipped Zellij "官方发布包未配置当前平台：$OS/$ARCH"; return 2 ;;
     esac
     if [[ -e "$HOME/.local/bin/zellij" || -L "$HOME/.local/bin/zellij" ]]; then
-        log_warn "保留现有文件，跳过 Zellij：$HOME/.local/bin/zellij"
+        record_result skipped Zellij "保留现有文件：$HOME/.local/bin/zellij" \
+            '检查现有文件及其执行权限，处理后重新运行 tools 模块。'
         return 2
     fi
     url="https://github.com/zellij-org/zellij/releases/download/v0.45.1/zellij-$target.tar.gz"
     approve_remote 'Zellij v0.45.1' "$url" || return $?
     ensure_packages tar || return $?
     if ! have sha256sum && ! have shasum; then
-        log_warn '安装 Zellij 发布包需要 sha256sum 或 shasum 校验 SHA256。'
+        record_result skipped Zellij '缺少 SHA256 校验工具，发布包未安装。' \
+            '安装 sha256sum 或 shasum 后重试。'
         return 2
     fi
-    mkdir -p "$XDG_CACHE_HOME/oh-my-devboom" "$HOME/.local/bin" || return 1
-    staging=$(mktemp -d "$XDG_CACHE_HOME/oh-my-devboom/zellij.XXXXXX") || return 1
+    mkdir -p "$XDG_CACHE_HOME/oh-my-devboom" "$HOME/.local/bin" || {
+        record_result failed Zellij "无法创建缓存目录或安装目录：$XDG_CACHE_HOME/oh-my-devboom、$HOME/.local/bin" \
+            '检查目录权限及磁盘空间后重试。'
+        return 1
+    }
+    staging=$(mktemp -d "$XDG_CACHE_HOME/oh-my-devboom/zellij.XXXXXX") || {
+        record_result failed Zellij "无法在 $XDG_CACHE_HOME/oh-my-devboom 创建下载临时目录。"
+        return 1
+    }
     download_file "$url" "$staging/archive.tar.gz" 1800 || result=$?
-    if [[ "$result" != 0 ]]; then rm -rf -- "$staging"; return "$result"; fi
+    if [[ "$result" != 0 ]]; then
+        if [[ "$result" == 2 ]]; then
+            record_result skipped Zellij '缺少 curl 或 wget，未下载发布包。' '完成 base 模块后重试。'
+        else
+            record_result failed Zellij "发布包下载失败或超时：$url" '检查网络和 GitHub 加速配置后重试。'
+        fi
+        rm -rf -- "$staging"
+        return "$result"
+    fi
     if have sha256sum; then
         checksum=$(sha256sum "$staging/archive.tar.gz") || result=1
     else
         checksum=$(shasum -a 256 "$staging/archive.tar.gz") || result=1
     fi
     if [[ "$result" != 0 || "${checksum%% *}" != "$sha256" ]]; then
-        log_error 'Zellij SHA256 校验失败，停止安装。'
+        record_result failed Zellij '发布包 SHA256 校验失败，未安装二进制文件。' \
+            '检查下载来源与网络代理后重新下载。'
         rm -rf -- "$staging"
         return 1
     fi
-    if ! tar -xzf "$staging/archive.tar.gz" -C "$staging" zellij ||
-        ! chmod +x "$staging/zellij" ||
-        ! mv -- "$staging/zellij" "$HOME/.local/bin/zellij"; then
+    if ! tar -xzf "$staging/archive.tar.gz" -C "$staging" zellij; then
+        record_result failed Zellij '发布包解压失败，未安装二进制文件。' '检查上方 tar 错误及磁盘空间后重试。'
+        rm -rf -- "$staging"
+        return 1
+    fi
+    if ! chmod +x "$staging/zellij"; then
+        record_result failed Zellij '无法为解压出的二进制文件设置执行权限。'
+        rm -rf -- "$staging"
+        return 1
+    fi
+    if ! mv -- "$staging/zellij" "$HOME/.local/bin/zellij"; then
+        record_result failed Zellij "无法将二进制文件安装到 $HOME/.local/bin/zellij。" \
+            '检查安装目录权限及磁盘空间后重试。'
         rm -rf -- "$staging"
         return 1
     fi
     rm -rf -- "$staging"
-    log_info 'Zellij 已安装到 ~/.local/bin；运行 zellij 启动会话。'
+    record_result installed Zellij "v0.45.1 已校验并安装到 $HOME/.local/bin/zellij。"
 }
 
 prepare_fzf_shell_integration() {
     # Recent fzf embeds its own integration; never upgrade an existing binary.
-    if fzf --zsh >/dev/null 2>&1; then return 0; fi
+    if fzf --zsh >/dev/null 2>&1; then
+        record_result ready 'fzf Zsh 集成' '当前 fzf 内置补全和 Ctrl-R / Ctrl-T / Alt-C 快捷键支持。'
+        return 0
+    fi
     local target="$XDG_DATA_HOME/oh-my-devboom/fzf" version fzf_path package_version
     local scripts=/usr/share/doc/fzf/examples staging='' result=0 archives
-    version=$(fzf --version) || return 1
+    version=$(fzf --version) || {
+        record_result failed 'fzf Zsh 集成' '无法读取 fzf 版本，未准备补全和快捷键。' '检查 fzf --version 的输出后重试。'
+        return 1
+    }
     if [[ -L "$target" || ( -e "$target" && ! -f "$target/fzf-version" ) ]]; then
-        log_warn "保留现有目录，跳过 fzf 集成：$target"
+        record_result skipped 'fzf Zsh 集成' "保留不属于当前安装流程的目录：$target" \
+            '检查并自行备份或移走冲突目录后重试。'
         return 2
     fi
     if [[ -r "$target/fzf-version" && "$(cat "$target/fzf-version")" == "$version" &&
           -r "$target/completion.zsh" && -r "$target/key-bindings.zsh" ]]; then
-        log_info 'fzf 的 Zsh 集成已就绪。'
+        record_result ready 'fzf Zsh 集成' "复用与 fzf $version 匹配的补全和快捷键脚本：$target"
         return 0
     fi
     fzf_path=$(command -v fzf)
     if ! have apt-get || ! have dpkg-query || ! have dpkg-deb ||
         [[ "$(dpkg-query -S "$fzf_path" 2>/dev/null)" != "fzf: $fzf_path" ]]; then
-        log_warn '当前旧版 fzf 不属于 APT 的 fzf 包；请升级到支持 --zsh 的版本以启用补全和快捷键。'
+        record_result skipped 'fzf Zsh 集成' '当前旧版 fzf 无法通过 APT 提取匹配的集成脚本。' \
+            '将 fzf 升级到支持 --zsh 的版本，以启用补全和快捷键。'
         return 2
     fi
-    package_version=$(dpkg-query -W -f='${Version}' fzf) || return 1
-    mkdir -p "$XDG_DATA_HOME/oh-my-devboom" || return 1
-    staging=$(mktemp -d "$XDG_DATA_HOME/oh-my-devboom/.fzf.XXXXXX") || return 1
+    package_version=$(dpkg-query -W -f='${Version}' fzf) || {
+        record_result failed 'fzf Zsh 集成' '无法读取已安装 fzf 的 APT 包版本。'
+        return 1
+    }
+    mkdir -p "$XDG_DATA_HOME/oh-my-devboom" || {
+        record_result failed 'fzf Zsh 集成' "无法创建数据目录：$XDG_DATA_HOME/oh-my-devboom" \
+            '检查目录权限及磁盘空间后重试。'
+        return 1
+    }
+    staging=$(mktemp -d "$XDG_DATA_HOME/oh-my-devboom/.fzf.XXXXXX") || {
+        record_result failed 'fzf Zsh 集成' "无法在 $XDG_DATA_HOME/oh-my-devboom 创建临时目录。"
+        return 1
+    }
     if [[ ! -r "$scripts/completion.zsh" || ! -r "$scripts/key-bindings.zsh" ]]; then
         # Extract the exact installed package, bypassing only doc-file exclusion.
         # APT keeps its configured repository authentication and hash checks.
@@ -91,17 +137,26 @@ prepare_fzf_shell_integration() {
         if (cd "$staging" && apt-get -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 \
             download "fzf=$package_version"); then
             archives=("$staging"/*.deb)
-            dpkg-deb -x "${archives[0]}" "$staging/package" || result=1
+            dpkg-deb -x "${archives[0]}" "$staging/package" || {
+                record_result failed 'fzf Zsh 集成' "无法解压 fzf=$package_version 的 APT 包。" \
+                    '检查上方 dpkg-deb 错误及磁盘空间后重试。'
+                result=1
+            }
             scripts="$staging/package/usr/share/doc/fzf/examples"
         else
-            log_error "无法下载已安装的 fzf=${package_version}；检查 APT 仓库和网络后重试。"
+            record_result failed 'fzf Zsh 集成' "无法从 APT 仓库下载已安装版本 fzf=${package_version}。" \
+                '检查 APT 仓库是否仍提供该版本，以及网络连接后重试。'
             result=1
         fi
     fi
     if [[ "$result" == 0 ]]; then
         mkdir "$staging/runtime" &&
             cp "$scripts/completion.zsh" "$scripts/key-bindings.zsh" "$staging/runtime/" &&
-            printf '%s\n' "$version" > "$staging/runtime/fzf-version" || result=1
+            printf '%s\n' "$version" > "$staging/runtime/fzf-version" || {
+                record_result failed 'fzf Zsh 集成' "无法从 $scripts 准备匹配版本的补全和快捷键脚本。" \
+                    '检查脚本是否完整，以及目录权限和磁盘空间后重试。'
+                result=1
+            }
     fi
     if [[ "$result" == 0 ]]; then
         if [[ -d "$target" ]]; then
@@ -111,22 +166,34 @@ prepare_fzf_shell_integration() {
             # Publish a complete directory on the same filesystem on first install.
             mv "$staging/runtime" "$target" || result=1
         fi
+        if [[ "$result" != 0 ]]; then
+            record_result failed 'fzf Zsh 集成' "无法将集成脚本完整部署到 ${target}。" \
+                '检查目录权限及磁盘空间，修复后重试以补齐脚本。'
+        fi
     fi
     rm -rf -- "$staging"
-    if [[ "$result" == 0 ]]; then log_info "fzf 的 Zsh 集成已部署：$target"; fi
+    if [[ "$result" == 0 ]]; then
+        record_result configured 'fzf Zsh 集成' "已部署与 fzf $version 匹配的补全和快捷键脚本：$target"
+    fi
     return "$result"
 }
 
 module_tools() {
-    local tool result status=0
+    local tool command_name result status=0
+    if [[ -z "$TOOLS" ]]; then
+        record_result skipped tools '未选择工具，无需执行。'
+        return 0
+    fi
     for tool in $TOOLS; do
+        result=0
         if have "$tool" || { [[ "$tool" == bat ]] && have batcat; } ||
             { [[ "$tool" == fd ]] && have fdfind; }; then
-            log_info "$tool 已安装。"
-            [[ "$tool" == fzf ]] || continue
-        fi
-        result=0
-        if [[ "$tool" == uv ]]; then
+            command_name=$tool
+            if ! have "$tool"; then
+                case "$tool" in bat) command_name=batcat ;; fd) command_name=fdfind ;; esac
+            fi
+            record_result ready "$tool" "复用现有命令 ${command_name}。"
+        elif [[ "$tool" == uv ]]; then
             if have brew && [[ "$USER_ID" != 0 ]]; then
                 PACKAGE_MANAGER=brew ensure_packages uv || result=$?
             else
@@ -134,13 +201,19 @@ module_tools() {
                     run_remote_installer uv https://astral.sh/uv/install.sh || result=$?
                 if [[ "$result" == 0 ]]; then
                     export PATH="$HOME/.local/bin:$PATH"
-                    have uv || { log_error "安装后未找到 uv。"; result=1; }
+                    if have uv; then
+                        record_result installed uv "已通过 Astral 安装器安装，命令路径：$(command -v uv)"
+                    else
+                        record_result failed uv "安装器已退出，但 PATH 中未找到 uv；预期目录：$HOME/.local/bin" \
+                            '检查安装器输出和安装目录后重试。'
+                        result=1
+                    fi
                 fi
             fi
         elif [[ "$tool" == zellij ]]; then
             install_zellij || result=$?
         elif [[ "$tool" == nvtop && "$OS" == macos && "$ARCH" != aarch64 ]]; then
-            log_warn 'NVTOP 的 macOS 后端仅支持 Apple GPU；当前架构跳过安装。'
+            record_result skipped NVTOP "macOS 后端仅支持 Apple GPU，当前架构为 ${ARCH}。"
             result=2
         else
             ensure_packages "$tool" || result=$?

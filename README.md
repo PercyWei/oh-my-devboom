@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | 基础工具 | git、curl、wget、vim、unzip、zsh | `base` |
 | 包管理器 | Homebrew | `homebrew` |
-| Zsh 增强 | Antidote 插件管理器，以及 zsh-completions（补全）、zsh-autosuggestions（输入建议）、zsh-syntax-highlighting（语法高亮） | `zsh` |
+| Zsh Augmented | Antidote 插件管理器，以及 zsh-completions（补全）、zsh-autosuggestions（输入建议）、zsh-syntax-highlighting（语法高亮） | `zsh` |
 | Prompt | Powerlevel10k、gitstatusd Git 状态辅助程序及个人主题预设 | `powerlevel10k` |
 | 配置部署 | Zsh 启动配置、插件列表、Git 通用配置和 Powerlevel10k 预设，通过软链接部署 | `dotfiles` |
 
@@ -43,7 +43,11 @@ vim config/local.conf
 bash bootstrap.sh --config config/local.conf
 ```
 
-安装前会显示模块、工具及安装策略，确认后执行；未授权的上游下载会逐项询问。
+安装前会显示环境、模块、工具及安装策略，确认后执行；未授权的上游下载会逐项询问。执行中显示模块编号、名称与耗时，例如 `[3/6] Zsh Augmented (zsh)`；配置和命令行仍使用 `zsh` 作为模块标识。
+
+结束摘要逐模块列出已安装、已就绪、已部署、已备份、跳过和失败的组件，包含实际路径、未完成原因和处理建议。模块整体分为完成、部分完成、跳过和失败；已有组件复用计入完成。需要重试时会提供保留本次安装选项的命令，并按实际配置部署结果提示 Shell 启动与 Git 身份设置。
+
+终端支持时使用彩色状态标签，设置 `NO_COLOR=1` 或 `TERM=dumb` 可关闭颜色；重定向的输出使用普通文本。包管理器和上游安装器保留自身输出与输入提示。组件状态和最终摘要写入 stderr，保存完整记录时同时重定向两个输出流，例如 `bash bootstrap.sh --config config/local.conf --non-interactive > install.log 2>&1`。
 
 非交互执行使用 `--non-interactive`；上游安装脚本、插件、主题和发布包需设置 `allow_remote=true` 或传入 `--allow-remote`，否则跳过对应下载。
 
@@ -105,7 +109,7 @@ conflict=skip
 
 ```text
 bootstrap.sh              # 配置读取、参数解析、清单确认、模块调度
-lib/                      # 系统检测、权限、包管理、下载及软链接
+lib/                      # 终端展示与结果记录、系统检测、包管理、下载及软链接
 modules/                  # 每个功能一个 Bash 模块
 config/
   default.conf            # 默认安装配置

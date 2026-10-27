@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 
-log_info() { printf '[info] %s\n' "$*"; }
-log_warn() { printf '[warn] %s\n' "$*" >&2; }
-log_error() { printf '[error] %s\n' "$*" >&2; }
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/output.sh"
+
+log_info() { print_styled '36' '[信息]'; printf ' %s\n' "$*"; }
+log_warn() { { print_styled '33' '[警告]'; printf ' %s\n' "$*"; } >&2; }
+log_error() { { print_styled '31' '[错误]'; printf ' %s\n' "$*"; } >&2; }
 have() { command -v "$1" >/dev/null 2>&1; }
 
 # Bound Git and Antidote's child Git processes without requiring GNU timeout.
@@ -81,15 +83,22 @@ download_file() {
 
 approve_remote() {
     local label=$1 source_url=$2 answer
-    log_info "$label source: $source_url"
+    log_info "$label 来源：$source_url"
     if [ "$ALLOW_REMOTE" -eq 1 ]; then return 0; fi
     if [ "$INTERACTIVE" -eq 0 ]; then
-        log_warn "$label skipped: direct upstream downloads require allow_remote=true or --allow-remote."
+        record_result skipped "$label" '未授权直接上游下载。' \
+            '确认所列来源后，使用 allow_remote=true 或 --allow-remote 重试对应模块。'
         return 2
     fi
-    printf 'Authorize installation of %s from the source above? [y/N] ' "$label"
-    IFS= read -r answer || return 2
-    case "$answer" in y|Y|yes|YES) return 0 ;; *) log_warn "$label skipped."; return 2 ;; esac
+    printf '允许从上述来源安装 %s？[y/N] ' "$label"
+    if ! IFS= read -r answer; then
+        record_result skipped "$label" '未读取到授权确认，未执行安装。'
+        return 2
+    fi
+    case "$answer" in
+        y|Y|yes|YES) return 0 ;;
+        *) record_result skipped "$label" '本次未授权安装。'; return 2 ;;
+    esac
 }
 
 run_remote_installer() {
@@ -99,19 +108,45 @@ run_remote_installer() {
         approve_remote "$label" "$source_url"
         return $?
     fi
-    mkdir -p "$XDG_CACHE_HOME/oh-my-devboom" || return 1
-    installer=$(mktemp "$XDG_CACHE_HOME/oh-my-devboom/installer.XXXXXX") || return 1
-    download_file "$source_url" "$installer" || { result=$?; rm -f "$installer"; return "$result"; }
-    log_info "Review $label installer: $installer"
+    mkdir -p "$XDG_CACHE_HOME/oh-my-devboom" || {
+        record_result failed "$label" "无法创建安装器缓存：$XDG_CACHE_HOME/oh-my-devboom" '检查缓存目录的权限和可用空间。'
+        return 1
+    }
+    installer=$(mktemp "$XDG_CACHE_HOME/oh-my-devboom/installer.XXXXXX") || {
+        record_result failed "$label" "无法在 $XDG_CACHE_HOME/oh-my-devboom 创建临时安装器。" '检查缓存目录的权限和可用空间。'
+        return 1
+    }
+    download_file "$source_url" "$installer" || result=$?
+    if [[ "$result" != 0 ]]; then
+        rm -f "$installer"
+        if [[ "$result" == 2 ]]; then
+            record_result skipped "$label" '缺少 curl 或 wget，无法下载安装器。' '先完成 base 模块。'
+        else
+            record_result failed "$label" "安装器下载失败：$source_url" '检查上方下载错误、网络和代理设置后重试。'
+        fi
+        return "$result"
+    fi
+    log_info "可检查 $label 安装脚本：$installer"
     if have sha256sum; then
-        checksum=$(sha256sum "$installer") || return 1
+        checksum=$(sha256sum "$installer") || {
+            record_result failed "$label" "无法计算安装器 SHA256：$installer"
+            return 1
+        }
         log_info "SHA256: ${checksum%% *}"
     elif have shasum; then
-        checksum=$(shasum -a 256 "$installer") || return 1
+        checksum=$(shasum -a 256 "$installer") || {
+            record_result failed "$label" "无法计算安装器 SHA256：$installer"
+            return 1
+        }
         log_info "SHA256: ${checksum%% *}"
     else
-        log_warn 'No SHA256 utility available; review the downloaded file before approval.'
+        log_warn '缺少 SHA256 工具；请在授权前检查已下载的安装脚本。'
     fi
     approve_remote "$label" "$source_url" || return $?
-    /bin/bash "$installer" "$@" || return 1
+    /bin/bash "$installer" "$@" || {
+        result=$?
+        record_result failed "$label" "上游安装器退出码 ${result}；脚本保留在 $installer" \
+            '检查上方安装器输出，处理对应错误后重试该模块。'
+        return 1
+    }
 }
