@@ -14,7 +14,7 @@
 | Prompt | Powerlevel10k、gitstatusd Git 状态辅助程序及个人主题预设 | `powerlevel10k` |
 | 配置部署 | Zsh 启动配置、插件列表、Git 通用配置和 Powerlevel10k 预设，通过软链接部署 | `dotfiles` |
 
-启用 `tools` 模块后，可在配置中逐项选择工具，或用 `--tools` 指定：
+以下开发工具默认启用，可在配置中逐项关闭，或用 `--tools` 指定：
 
 | 工具 | 用途 | `--tools` 名称 |
 | --- | --- | --- |
@@ -73,9 +73,9 @@ bash bootstrap.sh --non-interactive --modules tools --tools jq,fd
 | --- | --- |
 | `[modules]` | 各功能模块的总开关，值为 `true` 或 `false` |
 | `[tools]` | 每个可选开发工具的开关；仅在 `[modules]` 中 `tools=true` 时生效 |
-| `[options]` | `allow_remote=true\|false` 控制[上游下载授权](#上游下载与授权)；`github_proxy` 设置 GitHub 加速前缀；`conflict=skip\|backup` 控制已有配置的处理方式 |
+| `[options]` | `allow_remote=true\|false` 控制[上游下载授权](#上游下载与授权)；`github_proxy` 设置 GitHub 加速前缀；`git_timeout` 设置 Git 任务限时（正整数秒）；`conflict=skip\|backup` 控制已有配置的处理方式 |
 
-默认关闭 `tools`，其余模块启用。工具条目默认全部选中，启用 `tools` 时请按需调整。
+默认启用全部模块，工具条目也全部选中，请按需关闭不需要的内容。
 
 例如，安装基础工具、fzf、jq、fd 并部署配置：
 
@@ -95,7 +95,7 @@ allow_remote=false
 conflict=skip
 ```
 
-指定文件替代默认配置：未列出的模块和工具均关闭；未填写的选项采用 `allow_remote=false`、`conflict=skip`、`github_proxy=`（直连）。
+指定文件替代默认配置：未列出的模块和工具均关闭；未填写的选项采用 `allow_remote=false`、`conflict=skip`、`github_proxy=`（直连）、`git_timeout=600`。
 
 支持空行、`#` 注释和赋值两侧的空白。值不加引号，不展开变量；未知章节、键或无效值会报错。
 
@@ -173,7 +173,7 @@ exec zsh
 
 已有 `.zshrc` 默认保留，需要替换时使用 `--conflict backup`。仓库应放在持久化目录中；容器重建后，系统包和未持久化的工具、插件、缓存需重新安装。
 
-安装后先运行 `zsh` 检查配置，再按需修改默认 Shell：
+确认安装摘要无失败后，运行 `exec zsh` 切换当前 Shell。若要修改后续登录的默认 Shell，再运行：
 
 ```bash
 chsh -s "$(command -v zsh)"
@@ -254,7 +254,7 @@ Homebrew、uv 安装脚本随上游更新，未固定版本。未预授权时，
 | --- | --- |
 | curl | 连接超时 15 秒；连续 60 秒低于 1 字节/秒则中止；单次传输上限 300 秒，Zellij 为 1800 秒。最多重试 2 次，300 秒后不再发起重试，已开始的传输可继续 |
 | wget | 网络等待超时 30 秒；GNU wget 最多尝试 3 次，BusyBox wget 不重试，且其 DNS 查询不受该参数限制 |
-| Git | Antidote 克隆、整批插件下载、Powerlevel10k 拉取各限时 120 秒；HTTP 传输连续 30 秒低于 1 字节/秒也会中止 |
+| Git | Antidote 克隆、整批插件下载、Powerlevel10k 拉取各限时 `git_timeout` 秒，默认 600 秒；HTTP 传输连续 30 秒低于 1 字节/秒也会中止 |
 
 上述超时不适用于 Homebrew、uv 安装器内部及包管理器。
 
@@ -281,7 +281,7 @@ git ls-files -z '*.sh' | xargs -0 -n 1 bash -n
 
 **安装后命令仍找不到？** 重开终端或启动 `zsh`，并检查日志中是否有失败或跳过项。
 
-**插件或主题下载失败怎么办？** 检查日志中的下载地址和网络错误。默认经 ghfast.top 加速，设置 `github_proxy=` 可直连。网络恢复后沿用原配置重跑失败模块，例如：`bash bootstrap.sh --config config/local.conf --non-interactive --allow-remote --modules zsh,powerlevel10k`。
+**插件或主题下载失败怎么办？** 检查日志中的下载地址和错误。Git 总时限可在所用配置的 `[options]` 中通过 `git_timeout` 调整；连接失败或 HTTP 低速超时仍需排查网络。默认经 ghfast.top 加速，设置 `github_proxy=` 可直连。处理后沿用原配置重跑失败模块，例如：`bash bootstrap.sh --config config/local.conf --non-interactive --allow-remote --modules zsh,powerlevel10k`。
 
 **fzf 已安装，但快捷键不可用？** 运行 `bash bootstrap.sh --non-interactive --modules tools --tools fzf` 补齐 Shell 集成，再重开 Zsh。Debian/Ubuntu 旧版脚本从系统包源获取，无需 `--allow-remote`；若源中已无对应版本，先用原包管理器升级 fzf。
 

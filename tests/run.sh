@@ -105,9 +105,10 @@ RELEASE
         [[ "$output" != *starship* ]] || fail 'Removed Starship module is still listed'
         source "$REPO_ROOT/bootstrap.sh"
         parse_args --non-interactive
-        assert_equal 'base homebrew zsh powerlevel10k dotfiles' "$MODULES" 'Default modules include Powerlevel10k'
+        assert_equal 'base homebrew zsh powerlevel10k tools dotfiles' "$MODULES" 'Default config enables all listed modules'
         assert_equal 'fzf rg bat eza zoxide nvtop jq fd uv zellij' "$TOOLS" 'Default tools follow the grouped config order'
         assert_equal 'https://ghfast.top/' "$GITHUB_PROXY" 'Default config selects the GitHub download prefix'
+        assert_equal 600 "$GIT_TIMEOUT" 'Default Git download timeout is ten minutes'
         parse_args --modules powerlevel10k --non-interactive
         assert_equal powerlevel10k "$MODULES" 'Powerlevel10k module is accepted'
         parse_args --modules tools --tools zellij,nvtop,jq,fd --non-interactive
@@ -132,14 +133,16 @@ RELEASE
         parse_args --config "$config_file" --modules dotfiles --tools fd --allow-remote --conflict skip --non-interactive
         assert_equal 'dotfiles|fd|1|skip' "$MODULES|$TOOLS|$ALLOW_REMOTE|$CONFLICT_POLICY" 'CLI overrides config when placed after --config'
 
-        printf '[options]\nallow_remote=true\nconflict=backup\ngithub_proxy=https://proxy.example:8443/prefix/\n' > "$TEST_ROOT/options.conf"
+        printf '[options]\nallow_remote=true\nconflict=backup\ngithub_proxy=https://proxy.example:8443/prefix/\ngit_timeout=900\n' > "$TEST_ROOT/options.conf"
         parse_args --config "$TEST_ROOT/options.conf" --non-interactive
         assert_equal '||1|backup' "$MODULES|$TOOLS|$ALLOW_REMOTE|$CONFLICT_POLICY" 'Omitted module and tool selections stay empty'
         assert_equal 'https://proxy.example:8443/prefix/' "$GITHUB_PROXY" 'A custom HTTPS prefix may include a port and path'
+        assert_equal 900 "$GIT_TIMEOUT" 'Config can change the Git download timeout'
         : > "$TEST_ROOT/empty.conf"
         parse_args --config "$TEST_ROOT/empty.conf" --non-interactive
         assert_equal '||0|skip' "$MODULES|$TOOLS|$ALLOW_REMOTE|$CONFLICT_POLICY" 'Loading another config resets selections and safe options'
         assert_equal '' "$GITHUB_PROXY" 'Loading another config resets the GitHub prefix'
+        assert_equal 600 "$GIT_TIMEOUT" 'Loading another config resets the Git download timeout'
         printf '[options]\ngithub_proxy=\n' > "$TEST_ROOT/direct.conf"
         parse_args --config "$TEST_ROOT/direct.conf" --non-interactive
         assert_equal '' "$GITHUB_PROXY" 'An explicit empty prefix selects direct downloads'
@@ -147,7 +150,8 @@ RELEASE
         [[ "$output" == *'未选择安装模块'* ]] || fail 'An empty config should complete without installation'
 
         for contents in '[unknown]' '[modules]\nunknown=true' '[tools]\nfzf=true\nfzf=false' \
-            '[modules]\nbase=yes' '[options]\nconflict=replace' '[modules]\nbase' '[modules]\nbase="true"'; do
+            '[modules]\nbase=yes' '[options]\nconflict=replace' '[modules]\nbase' '[modules]\nbase="true"' \
+            '[options]\ngit_timeout=0' '[options]\ngit_timeout=-1' '[options]\ngit_timeout=1.5' '[options]\ngit_timeout='; do
             printf '%b\n' "$contents" > "$TEST_ROOT/invalid.conf"
             if parse_args --config "$TEST_ROOT/invalid.conf" --non-interactive > "$TEST_ROOT/output" 2>&1; then
                 fail "Invalid config was accepted: $contents"
@@ -346,9 +350,11 @@ RELEASE
     remote)
         source "$REPO_ROOT/lib/common.sh"
         GITHUB_PROXY=''
-        # Shorten only the fixed network timer; all processes belong to these fixtures.
+        GIT_TIMEOUT=37
+        # Record and shorten the network timer; retain the one-second cleanup delay.
         sleep() {
-            if [[ "$1" == 120 ]]; then
+            if [[ "$1" != 1 ]]; then
+                printf '%s\n' "$1" > "$NETWORK_TEST_DIR/timer-seconds"
                 command sleep "$NETWORK_TIMER_SECONDS" &
                 printf '%s\n' "$!" > "$NETWORK_TEST_DIR/timer.pid"
                 wait "$!"
@@ -390,8 +396,9 @@ FIXTURE
             expected=1
             [[ "$NETWORK_SCENARIO" != success ]] || expected=0
             assert_equal "$expected" "$status" "Git download $NETWORK_SCENARIO status"
+            assert_equal "$GIT_TIMEOUT" "$(cat "$NETWORK_TEST_DIR/timer-seconds")" 'Git helper uses the configured timer duration'
             case "$NETWORK_SCENARIO" in
-                timeout*) [[ "$(cat "$NETWORK_TEST_DIR/output")" == *'Git download timed out after 120 seconds'* ]] || fail 'Git timeout message was hidden' ;;
+                timeout*) [[ "$(cat "$NETWORK_TEST_DIR/output")" == *"Git download timed out after $GIT_TIMEOUT seconds"* ]] || fail 'Git timeout message omits the configured duration' ;;
             esac
             assert_equal '0 1 30' "$(cat "$NETWORK_TEST_DIR/env")" 'Git timeout settings reach child commands'
             for pid_file in "$NETWORK_TEST_DIR/"*.pid; do

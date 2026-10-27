@@ -7,7 +7,7 @@ have() { command -v "$1" >/dev/null 2>&1; }
 
 # Bound Git and Antidote's child Git processes without requiring GNU timeout.
 run_git_download() (
-    local download_pid='' timer_pid='' helper_pid pid
+    local download_pid='' timer_pid='' helper_pid pid git_timeout=$GIT_TIMEOUT
     local -x GIT_TERMINAL_PROMPT=0 GIT_HTTP_LOW_SPEED_LIMIT=1 GIT_HTTP_LOW_SPEED_TIME=30
     if [[ -n "${GITHUB_PROXY:-}" ]]; then
         local config_count=${GIT_CONFIG_COUNT:-0}
@@ -38,7 +38,7 @@ run_git_download() (
         done
     ' EXIT
     trap 'exit 1' HUP INT TERM
-    trap 'log_error "Git download timed out after 120 seconds; check network or proxy access."; exit 1' ALRM
+    trap 'log_error "Git download timed out after $git_timeout seconds; adjust git_timeout or check network/proxy access."; exit 1' ALRM
     # Separate process groups let cleanup include grandchildren, not just git itself.
     set -m
     "$@" &
@@ -46,7 +46,7 @@ run_git_download() (
     (
         trap - EXIT HUP INT TERM ALRM
         set +m
-        sleep 120
+        sleep "$git_timeout"
         kill -ALRM "$helper_pid" 2>/dev/null || :
     ) &
     timer_pid=$!

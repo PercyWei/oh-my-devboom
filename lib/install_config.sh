@@ -10,6 +10,7 @@ load_install_config() {
     ALLOW_REMOTE=0
     CONFLICT_POLICY=skip
     GITHUB_PROXY=''
+    GIT_TIMEOUT=600
     if [[ ! -f "$file" || ! -r "$file" ]]; then
         log_error "Cannot read installation config: $file"
         return 1
@@ -54,7 +55,7 @@ load_install_config() {
                 ;;
             options)
                 case "$key" in
-                    allow_remote|conflict|github_proxy) ;;
+                    allow_remote|conflict|github_proxy|git_timeout) ;;
                     *) log_error "$file:$line_number: Unknown option: $key"; return 1 ;;
                 esac
                 ;;
@@ -75,6 +76,12 @@ load_install_config() {
                 return 1
             fi
             GITHUB_PROXY=$value
+        elif [[ "$section:$key" == options:git_timeout ]]; then
+            if [[ ! "$value" =~ ^[1-9][0-9]*$ ]]; then
+                log_error "$file:$line_number: git_timeout must be a positive integer in seconds"
+                return 1
+            fi
+            GIT_TIMEOUT=$value
         else
             case "$value" in
                 true)
