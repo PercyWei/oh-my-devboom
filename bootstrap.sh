@@ -24,8 +24,8 @@ Set up a personal development environment on Linux or macOS (Bash 3.2+).
                     clashctl and its Mihomo/yq components;
                     Homebrew/uv installers; Antidote and Zsh plugins;
                     Powerlevel10k theme, gitstatusd and Zellij release binaries.
-                    Package-manager installs and local config links are unaffected.
-  --conflict POLICY Override config conflicts: skip or backup before linking
+                    Package-manager installs and local config copies are unaffected.
+  --conflict POLICY Override config conflicts: skip or backup before copying
   --list-modules    Describe modules and exit
   -h, --help        Show this help and exit
 
@@ -49,7 +49,7 @@ homebrew   Install Homebrew when its host requirements are met
 zsh        Zsh Augmented: Antidote, completions, suggestions and highlighting
 powerlevel10k Install the Powerlevel10k Zsh prompt
 tools      Install selected optional developer tools
-dotfiles   Link Zsh, Git, Powerlevel10k and plugin configuration
+dotfiles   Copy Zsh, Git, Powerlevel10k and plugin configuration
 shell      Set the current account's login shell to Zsh
 EOF
 }
@@ -191,7 +191,7 @@ print_install_summary() {
         [[ "${RESULT_LABELS[$item]}" != "$HOME/.gitconfig" ]] || git_config_ready=1
     done
     if [[ "$zsh_config_ready" == 1 ]] && have zsh; then
-        printf '\n下一步：运行 exec zsh 使用当前配置；配置软链接依赖当前仓库目录，请保留该目录。\n'
+        printf '\n下一步：运行 exec zsh 使用当前配置；已成功部署的配置为独立文件，可直接编辑，不依赖仓库目录。\n'
     fi
     if [[ "$git_config_ready" == 1 ]] && have git; then
         local git_name='' git_email=''

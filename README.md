@@ -13,7 +13,7 @@
 | 包管理器 | Homebrew | `homebrew` |
 | Zsh Augmented | Antidote 插件管理器，以及 zsh-completions（补全）、zsh-autosuggestions（输入建议）、zsh-syntax-highlighting（语法高亮） | `zsh` |
 | Prompt | Powerlevel10k、gitstatusd Git 状态辅助程序及个人主题预设 | `powerlevel10k` |
-| 配置部署 | Zsh 启动配置、插件列表、Git 通用配置和 Powerlevel10k 预设，通过软链接部署 | `dotfiles` |
+| 配置部署 | 将 Zsh 启动配置、插件列表、Git 通用配置和 Powerlevel10k 预设复制到用户目录 | `dotfiles` |
 | 默认 Shell | 将当前执行账户的登录 Shell 设为 Zsh | `shell` |
 
 以下开发工具默认启用，可在配置中逐项关闭，或用 `--tools` 指定：
@@ -76,7 +76,7 @@ bash bootstrap.sh --non-interactive --modules dotfiles
 bash bootstrap.sh --non-interactive --modules tools --tools jq,fd
 ```
 
-配置通过软链接指向仓库文件。部署后请保留仓库目录；移动后需重新部署。
+配置以普通文件部署，安装后不依赖仓库目录。更新仓库预设后，需重新部署才会生效。
 
 ## 安装选择配置
 
@@ -123,7 +123,7 @@ conflict=skip
 
 ```text
 bootstrap.sh              # 配置读取、参数解析、清单确认、模块调度
-lib/                      # 终端展示与结果记录、系统检测、包管理、下载及软链接
+lib/                      # 终端展示与结果记录、系统检测、包管理、下载及配置部署
 modules/                  # 每个功能一个 Bash 模块
 config/
   default.conf            # 默认安装配置
@@ -221,7 +221,7 @@ bash bootstrap.sh --config config/local.conf --non-interactive --allow-remote \
 exec zsh
 ```
 
-已有 `.zshrc` 默认保留，需要替换时使用 `--conflict backup`。仓库应放在持久化目录中；容器重建后，系统包和未持久化的工具、插件、缓存需重新安装。
+已有 `.zshrc` 的内容默认保留，需要替换时使用 `--conflict backup`。容器重建后，系统包和未持久化的配置、工具、插件、缓存需重新安装或部署。
 
 `shell` 模块通过 `chsh` 修改当前执行账户，已使用 Zsh 时跳过。请以目标账户运行；通过 `sudo bash bootstrap.sh` 执行时，修改的是 root 账户。模块选用 `/etc/shells` 中已登记且可执行的 Zsh；缺少有效路径或 `chsh` 时会提示跳过。
 
@@ -235,7 +235,7 @@ exec zsh
 
 ## 程序配置部署
 
-程序配置位于 `config/`，通过软链接部署到以下位置。`XDG_CONFIG_HOME` 默认为 `~/.config`。
+程序配置位于 `config/`，复制到以下位置。`XDG_CONFIG_HOME` 默认为 `~/.config`。
 
 | 仓库文件 | 目标 |
 | --- | --- |
@@ -244,7 +244,7 @@ exec zsh
 | `config/git/gitconfig` | `~/.gitconfig` |
 | `config/powerlevel10k/p10k.zsh` | `${ZDOTDIR:-$HOME}/.p10k.zsh` |
 
-直接编辑仓库文件即可修改配置，Shell 配置需重新打开终端加载。插件列表使用固定提交，修改后需重跑 `zsh` 模块生成静态配置。`dotfiles` 仅部署文件，插件和主题需启用对应安装模块。
+直接编辑目标文件即可修改配置，Shell 配置需重新打开终端加载。更新仓库预设后，需重跑 `dotfiles` 模块部署。插件列表使用固定提交，修改后需重跑 `zsh` 模块生成静态配置。`dotfiles` 仅部署文件，插件和主题需启用对应安装模块。
 
 fzf 提供 Ctrl-R、Ctrl-T 和 Alt-C 快捷键，zoxide 提供 `z`、`zi` 目录跳转命令。新版 fzf 使用 `fzf --zsh` 初始化；Debian/Ubuntu 旧版所需脚本在安装时缓存到 `${XDG_DATA_HOME:-$HOME/.local/share}/oh-my-devboom/fzf`，仅加载与当前版本匹配的脚本。精简容器缺少这些脚本时，从 APT 仓库下载对应版本包提取；其他来源的旧版 fzf 需升级。
 
@@ -254,14 +254,14 @@ Powerlevel10k 需要 Zsh 5.1+，安装在 `${XDG_DATA_HOME:-$HOME/.local/share}/
 
 请在本机终端配置兼容 Nerd Font v3 的字体，如 [MesloLGS NF](https://github.com/romkatv/powerlevel10k#fonts)。
 
-修改 `config/powerlevel10k/p10k.zsh` 后，运行 `source "${ZDOTDIR:-$HOME}/.p10k.zsh"` 加载。也可使用 [`p10k configure`](https://github.com/romkatv/powerlevel10k#configuration-wizard) 向导；由于 `.p10k.zsh` 是软链接，向导会更新仓库中的预设。
+修改 `${ZDOTDIR:-$HOME}/.p10k.zsh` 后，运行 `source "${ZDOTDIR:-$HOME}/.p10k.zsh"` 加载。也可使用 [`p10k configure`](https://github.com/romkatv/powerlevel10k#configuration-wizard) 向导调整主题，仓库中的预设不受影响。
 
 部署遵循以下规则：
 
-- 目标不存在：创建软链接。
-- 已指向当前配置：跳过。
-- 存在冲突：默认 `skip`，保留原文件。
-- 使用 `--conflict backup`：将原文件、目录或链接备份后再部署，日志显示带时间戳的备份路径。
+- 目标不存在：复制为普通文件。
+- 普通文件内容相同：跳过。
+- 已有软链接指向普通文件：转换为保留当前内容的普通文件，本次不替换为仓库预设，不受 `skip/backup` 影响。
+- 其他冲突（文件内容不同、目录、悬空链接或目录链接）：默认 `skip`，保留原内容；使用 `--conflict backup` 时，先备份再复制，日志显示带时间戳的备份路径。
 
 绕过 Clash，仅重新部署配置：
 
@@ -269,7 +269,7 @@ Powerlevel10k 需要 Zsh 5.1+，安装在 `${XDG_DATA_HOME:-$HOME/.local/share}/
 bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
 ```
 
-恢复时，删除对应软链接，再将日志中的备份移回原位置。
+恢复时，将日志中的备份移回原位置，替换当前配置文件。
 
 Git 通用配置加载 `~/.gitconfig.local`，个人信息写入该文件：
 
@@ -332,7 +332,7 @@ Clash 的真实下载、配置导入和服务启动仍需在新 Linux 容器复�
 
 **无权限安装系统包怎么办？** 系统包需要 root 或 sudo；可先部署配置和支持用户级安装的工具。
 
-**已有 `.zshrc` 会被覆盖吗？** 默认保留。用 `--conflict backup` 备份后部署仓库配置，备份路径见日志。
+**已有 `.zshrc` 会被覆盖吗？** 默认保留内容；软链接按[部署规则](#程序配置部署)转换为普通文件。用 `--conflict backup` 备份冲突文件后部署仓库配置，备份路径见日志。
 
 **安装后命令仍找不到？** 重开终端或启动 `zsh`，并检查日志中是否有失败或跳过项。
 
@@ -342,6 +342,6 @@ Clash 的真实下载、配置导入和服务启动仍需在新 Linux 容器复�
 
 **fzf 已安装，但快捷键不可用？** 运行 `bash bootstrap.sh --non-interactive --modules tools --tools fzf` 绕过 Clash、补齐 Shell 集成，再重开 Zsh。Debian/Ubuntu 旧版脚本从系统包源获取，无需 `--allow-remote`；若源中已无对应版本，先用原包管理器升级 fzf。
 
-**只安装 Prompt，不接管 Shell 配置？** 只选择 `powerlevel10k`，将 `config/powerlevel10k/p10k.zsh` 复制或链接到 `${ZDOTDIR:-$HOME}/.p10k.zsh`，再参照 `config/zsh/zshrc`，把 instant prompt 和主题、预设的加载语句加入自己的 `.zshrc`。
+**只安装 Prompt，不接管 Shell 配置？** 只选择 `powerlevel10k`，将 `config/powerlevel10k/p10k.zsh` 复制到 `${ZDOTDIR:-$HOME}/.p10k.zsh`，再参照 `config/zsh/zshrc`，把 instant prompt 和主题、预设的加载语句加入自己的 `.zshrc`。
 
-**如何更新配置或工具？** 更新仓库后重跑所需模块；工具升级使用原包管理器或工具自身的更新命令。
+**如何更新配置或工具？** 更新仓库后重跑所需模块；部署不同的配置内容需使用 `--conflict backup`，否则保留当前文件。工具升级使用原包管理器或工具自身的更新命令。

@@ -213,7 +213,7 @@ RELEASE
         parse_args --config "$config_file" --non-interactive
         assert_equal dotfiles "$MODULES" 'shell=false disables login shell changes'
         output=$("$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --config "$config_file" --non-interactive)
-        [[ -L "$HOME/.zshrc" && -L "$HOME/.gitconfig" ]] || fail 'Custom config did not deploy selected dotfiles'
+        [[ -f "$HOME/.zshrc" && ! -L "$HOME/.zshrc" && -f "$HOME/.gitconfig" && ! -L "$HOME/.gitconfig" ]] || fail 'Custom config did not copy selected dotfiles'
         [[ "$output" == *'  dotfiles:'* && "$output" == *'未启用 tools 模块'* && "$output" != *'  tools:'* ]] || fail 'Plan presents disabled optional tools as installation targets'
         ;;
     config)
@@ -221,28 +221,28 @@ RELEASE
         source "$REPO_ROOT/lib/config.sh"
         printf 'managed config\n' > "$TEST_ROOT/source"
         CONFLICT_POLICY=skip
-        link_config "$TEST_ROOT/source" "$HOME/new/config"
-        [[ -L "$HOME/new/config" ]] || fail 'Fresh config is not a symlink'
-        assert_equal "$TEST_ROOT/source" "$(readlink "$HOME/new/config")" 'Symlink target'
+        deploy_config "$TEST_ROOT/source" "$HOME/new/config"
+        [[ -f "$HOME/new/config" && ! -L "$HOME/new/config" ]] || fail 'Fresh config is not a regular file'
+        cmp -s "$TEST_ROOT/source" "$HOME/new/config" || fail 'Copied config differs from source'
 
         printf 'personal config\n' > "$HOME/existing"
         status=0
-        link_config "$TEST_ROOT/source" "$HOME/existing" || status=$?
+        deploy_config "$TEST_ROOT/source" "$HOME/existing" || status=$?
         assert_equal 2 "$status" 'Skip reports a conflict'
         [[ ! -L "$HOME/existing" ]] || fail 'Skip replaced a user file'
         assert_equal 'personal config' "$(cat "$HOME/existing")" 'Skip preserves contents'
 
         CONFLICT_POLICY=backup
-        link_config "$TEST_ROOT/source" "$HOME/existing"
+        deploy_config "$TEST_ROOT/source" "$HOME/existing"
         shopt -s nullglob
         backups=("$HOME/existing.backup."*)
         assert_equal 1 "${#backups[@]}" 'One backup was created'
         assert_equal 'personal config' "$(cat "${backups[0]}")" 'Backup preserves contents'
-        [[ -L "$HOME/existing" ]] || fail 'Backup did not deploy a symlink'
+        [[ -f "$HOME/existing" && ! -L "$HOME/existing" ]] || fail 'Backup did not deploy a regular file'
 
         mkdir -p "$HOME/directory"
         printf 'keep directory\n' > "$HOME/directory/file"
-        link_config "$TEST_ROOT/source" "$HOME/directory"
+        deploy_config "$TEST_ROOT/source" "$HOME/directory"
         backups=("$HOME/directory.backup."*)
         assert_equal 1 "${#backups[@]}" 'Directory conflict was backed up'
         assert_equal 'keep directory' "$(cat "${backups[0]}/file")" 'Directory contents were preserved'
@@ -250,7 +250,7 @@ RELEASE
         ln -s "$TEST_ROOT/missing" "$HOME/dangling"
         CONFLICT_POLICY=skip
         status=0
-        link_config "$TEST_ROOT/source" "$HOME/dangling" || status=$?
+        deploy_config "$TEST_ROOT/source" "$HOME/dangling" || status=$?
         assert_equal 2 "$status" 'Dangling symlink is treated as a conflict'
         assert_equal "$TEST_ROOT/missing" "$(readlink "$HOME/dangling")" 'Dangling symlink was preserved'
         ;;
@@ -260,33 +260,33 @@ RELEASE
         printf 'managed config\n' > "$TEST_ROOT/source"
         printf 'personal config\n' > "$HOME/existing"
         CONFLICT_POLICY=backup
-        link_config "$TEST_ROOT/source" "$HOME/existing"
-        first_target=$(readlink "$HOME/existing")
-        link_config "$TEST_ROOT/source" "$HOME/existing"
-        assert_equal "$first_target" "$(readlink "$HOME/existing")" 'Repeated link has the same target'
+        deploy_config "$TEST_ROOT/source" "$HOME/existing"
+        cp "$HOME/existing" "$TEST_ROOT/first-copy"
+        deploy_config "$TEST_ROOT/source" "$HOME/existing"
+        cmp -s "$TEST_ROOT/first-copy" "$HOME/existing" || fail 'Repeated deployment changed contents'
         shopt -s nullglob
         backups=("$HOME/existing.backup."*)
         assert_equal 1 "${#backups[@]}" 'Repeated deployment creates no new backup'
 
         "$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --modules dotfiles --non-interactive > "$TEST_ROOT/first-run.log" 2>&1 || { cat "$TEST_ROOT/first-run.log" >&2; fail 'First dotfiles run failed'; }
         "$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --modules dotfiles --non-interactive > "$TEST_ROOT/second-run.log" 2>&1 || { cat "$TEST_ROOT/second-run.log" >&2; fail 'Second dotfiles run failed'; }
-        [[ -L "$HOME/.zshrc" ]] || fail 'Dotfiles module did not deploy .zshrc'
-        [[ -L "$HOME/.gitconfig" ]] || fail 'Dotfiles module did not deploy .gitconfig'
-        [[ -L "$HOME/.p10k.zsh" ]] || fail 'Dotfiles module did not deploy .p10k.zsh'
-        assert_equal "$REPO_ROOT/config/powerlevel10k/p10k.zsh" "$(readlink "$HOME/.p10k.zsh")" 'Powerlevel10k preset source'
+        [[ -f "$HOME/.zshrc" && ! -L "$HOME/.zshrc" ]] || fail 'Dotfiles module did not copy .zshrc'
+        [[ -f "$HOME/.gitconfig" && ! -L "$HOME/.gitconfig" ]] || fail 'Dotfiles module did not copy .gitconfig'
+        [[ -f "$HOME/.p10k.zsh" && ! -L "$HOME/.p10k.zsh" ]] || fail 'Dotfiles module did not copy .p10k.zsh'
+        cmp -s "$REPO_ROOT/config/powerlevel10k/p10k.zsh" "$HOME/.p10k.zsh" || fail 'Powerlevel10k preset differs from source'
         [[ -z "$(find "$HOME" -name '*.backup.*' ! -path "$HOME/existing.backup.*" -print)" ]] || fail 'Repeated CLI deployment made unexpected backups'
 
         export ZDOTDIR="$HOME/custom-zsh"
         mkdir -p "$ZDOTDIR"
         printf 'personal prompt\n' > "$ZDOTDIR/.p10k.zsh"
         "$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --modules dotfiles --non-interactive > "$TEST_ROOT/skip-run.log" 2>&1 || { cat "$TEST_ROOT/skip-run.log" >&2; fail 'Dotfiles skip run failed'; }
-        [[ -L "$ZDOTDIR/.zshrc" ]] || fail 'Dotfiles module did not respect ZDOTDIR for .zshrc'
+        [[ -f "$ZDOTDIR/.zshrc" && ! -L "$ZDOTDIR/.zshrc" ]] || fail 'Dotfiles module did not respect ZDOTDIR for .zshrc'
         [[ ! -L "$ZDOTDIR/.p10k.zsh" ]] || fail 'Default skip policy replaced a personal Powerlevel10k preset'
         assert_equal 'personal prompt' "$(cat "$ZDOTDIR/.p10k.zsh")" 'Skipped Powerlevel10k preset is preserved'
         "$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --modules dotfiles --non-interactive --conflict backup > "$TEST_ROOT/backup-run.log" 2>&1 || { cat "$TEST_ROOT/backup-run.log" >&2; fail 'Dotfiles backup run failed'; }
         "$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --modules dotfiles --non-interactive --conflict backup > "$TEST_ROOT/repeated-backup-run.log" 2>&1 || { cat "$TEST_ROOT/repeated-backup-run.log" >&2; fail 'Repeated dotfiles backup run failed'; }
-        [[ -L "$ZDOTDIR/.p10k.zsh" ]] || fail 'Dotfiles module did not respect ZDOTDIR for .p10k.zsh'
-        assert_equal "$REPO_ROOT/config/powerlevel10k/p10k.zsh" "$(readlink "$ZDOTDIR/.p10k.zsh")" 'ZDOTDIR Powerlevel10k preset source'
+        [[ -f "$ZDOTDIR/.p10k.zsh" && ! -L "$ZDOTDIR/.p10k.zsh" ]] || fail 'Dotfiles module did not respect ZDOTDIR for .p10k.zsh'
+        cmp -s "$REPO_ROOT/config/powerlevel10k/p10k.zsh" "$ZDOTDIR/.p10k.zsh" || fail 'ZDOTDIR Powerlevel10k preset differs from source'
         backups=("$ZDOTDIR/.p10k.zsh.backup."*)
         assert_equal 1 "${#backups[@]}" 'Repeated Powerlevel10k deployment creates one backup'
         assert_equal 'personal prompt' "$(cat "${backups[0]}")" 'Powerlevel10k backup preserves contents'

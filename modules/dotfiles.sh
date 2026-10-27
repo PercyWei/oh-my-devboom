@@ -10,7 +10,7 @@ module_dotfiles() {
             powerlevel10k) source="$ROOT_DIR/config/powerlevel10k/p10k.zsh"; destination="${ZDOTDIR:-$HOME}/.p10k.zsh" ;;
         esac
         result=0
-        link_config "$source" "$destination" || result=$?
+        deploy_config "$source" "$destination" || result=$?
         if [[ "$result" == 1 ]]; then
             status=1
         elif [[ "$result" == 2 && "$status" == 0 ]]; then
