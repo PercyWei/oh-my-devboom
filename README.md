@@ -144,6 +144,8 @@ git config --file "$HOME/.gitconfig.local" user.email "you@example.com"
 
 `clash` 使用 [nelvko/clashctl](https://github.com/nelvko/clashctl)，要求 Linux 和 Bash 4+，安装在 `${XDG_DATA_HOME:-$HOME/.local/share}/clashctl`，与 `oh-my-devboom` 数据目录同级。
 
+clashctl 源码从 [Gitee 镜像](https://gitee.com/back_door/clashctl)直连下载，固定提交并校验 SHA-256。Mihomo 和 yq 仍由上游安装器从 GitHub 下载，使用配置中的 `github_proxy` 加速前缀。
+
 - 从服务器本地 YAML 导入配置；Clash 就绪并通过联网检查后，才继续后续安装。未就绪会停止安装。
 - 代理启用后，本轮下载使用原始 GitHub URL，不再叠加 GitHub 加速前缀。
 - 安装结束、报错退出或可捕获的中断时关闭该目录的 Clash 内核，保留程序与配置。

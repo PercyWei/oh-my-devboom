@@ -4,6 +4,7 @@ module_clash() {
     local clash_dir="$XDG_DATA_HOME/clashctl"
     local cache="$XDG_CACHE_HOME/oh-my-devboom" staging checksum service=auto
     local commit=e38d643725594c38c3fb02f355a2c89eba9c296c
+    local source_url="https://gitee.com/back_door/clashctl/repository/archive/$commit.tar.gz"
     local archive_sha256=172e68840d6b81e454950f90e81439fc0ca424e589b1f2f5de36aa9a39d12fef
     local complete=0 result=0 RECORD_PACKAGE_RESULTS=0
     local env_file name value proxy_values=() dependencies=(curl tar gzip unzip sha256sum shuf od timeout)
@@ -46,7 +47,7 @@ module_clash() {
     fi
     if [[ "$complete" == 0 ]]; then
         approve_remote 'clashctl、Mihomo 和 yq' \
-            "https://github.com/nelvko/clashctl/tree/$commit；https://github.com/MetaCubeX/mihomo；https://github.com/mikefarah/yq" || return 1
+            "$source_url；https://github.com/MetaCubeX/mihomo；https://github.com/mikefarah/yq" || return 1
     fi
 
     # 代理建立前只准备它自身所需的系统命令；Alpine 的 BusyBox 不能替代 GNU 工具。
@@ -74,7 +75,7 @@ module_clash() {
         [[ "$IN_CONTAINER" != 1 ]] || service=nohup
         if ! (
             trap 'rm -rf -- "$staging"' EXIT
-            download_file "https://github.com/nelvko/clashctl/archive/$commit.tar.gz" "$staging/source.tar.gz" || exit 1
+            download_file "$source_url" "$staging/source.tar.gz" || exit 1
             checksum=$(sha256sum "$staging/source.tar.gz") || exit 1
             if [[ "${checksum%% *}" != "$archive_sha256" ]]; then
                 log_error 'clashctl 源码 SHA256 校验失败，未运行安装器。'
