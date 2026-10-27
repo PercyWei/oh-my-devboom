@@ -107,6 +107,7 @@ RELEASE
         parse_args --non-interactive
         assert_equal 'base homebrew zsh powerlevel10k dotfiles' "$MODULES" 'Default modules include Powerlevel10k'
         assert_equal 'fzf rg bat eza zoxide nvtop jq fd uv zellij' "$TOOLS" 'Default tools follow the grouped config order'
+        assert_equal 'https://ghfast.top/' "$GITHUB_PROXY" 'Default config selects the GitHub download prefix'
         parse_args --modules powerlevel10k --non-interactive
         assert_equal powerlevel10k "$MODULES" 'Powerlevel10k module is accepted'
         parse_args --modules tools --tools zellij,nvtop,jq,fd --non-interactive
@@ -123,6 +124,7 @@ RELEASE
         assert_equal jq "$TOOLS" 'Only enabled tools from the custom config are selected'
         assert_equal 0 "$ALLOW_REMOTE" 'Config can leave remote code unauthorized'
         assert_equal backup "$CONFLICT_POLICY" 'The final config line is read without a newline'
+        assert_equal '' "$GITHUB_PROXY" 'A custom config without github_proxy uses direct downloads'
         output=$(print_install_plan "$AVAILABLE_MODULES")
         [[ "$output" == *"$config_file"* && "$output" == *'  tools: jq'* ]] || fail 'Plan omits config source or selected tools'
         parse_args --modules dotfiles --tools fd --allow-remote --conflict skip --config "$config_file" --non-interactive
@@ -130,12 +132,17 @@ RELEASE
         parse_args --config "$config_file" --modules dotfiles --tools fd --allow-remote --conflict skip --non-interactive
         assert_equal 'dotfiles|fd|1|skip' "$MODULES|$TOOLS|$ALLOW_REMOTE|$CONFLICT_POLICY" 'CLI overrides config when placed after --config'
 
-        printf '[options]\nallow_remote=true\nconflict=backup\n' > "$TEST_ROOT/options.conf"
+        printf '[options]\nallow_remote=true\nconflict=backup\ngithub_proxy=https://proxy.example:8443/prefix/\n' > "$TEST_ROOT/options.conf"
         parse_args --config "$TEST_ROOT/options.conf" --non-interactive
         assert_equal '||1|backup' "$MODULES|$TOOLS|$ALLOW_REMOTE|$CONFLICT_POLICY" 'Omitted module and tool selections stay empty'
+        assert_equal 'https://proxy.example:8443/prefix/' "$GITHUB_PROXY" 'A custom HTTPS prefix may include a port and path'
         : > "$TEST_ROOT/empty.conf"
         parse_args --config "$TEST_ROOT/empty.conf" --non-interactive
         assert_equal '||0|skip' "$MODULES|$TOOLS|$ALLOW_REMOTE|$CONFLICT_POLICY" 'Loading another config resets selections and safe options'
+        assert_equal '' "$GITHUB_PROXY" 'Loading another config resets the GitHub prefix'
+        printf '[options]\ngithub_proxy=\n' > "$TEST_ROOT/direct.conf"
+        parse_args --config "$TEST_ROOT/direct.conf" --non-interactive
+        assert_equal '' "$GITHUB_PROXY" 'An explicit empty prefix selects direct downloads'
         output=$("$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --config "$TEST_ROOT/empty.conf" --non-interactive)
         [[ "$output" == *'未选择安装模块'* ]] || fail 'An empty config should complete without installation'
 
@@ -146,6 +153,13 @@ RELEASE
                 fail "Invalid config was accepted: $contents"
             fi
             [[ "$(cat "$TEST_ROOT/output")" == *"$TEST_ROOT/invalid.conf:"* ]] || fail 'Config diagnostics omit the file and line'
+        done
+        for prefix in 'http://proxy.example/' 'https://proxy.example' 'https:///' \
+            'https://user@proxy.example/' 'https://proxy.example/?token=x/' 'https://proxy.example/a b/'; do
+            printf '[options]\ngithub_proxy=%s\n' "$prefix" > "$TEST_ROOT/invalid.conf"
+            if parse_args --config "$TEST_ROOT/invalid.conf" --non-interactive > "$TEST_ROOT/output" 2>&1; then
+                fail "Invalid GitHub prefix was accepted: $prefix"
+            fi
         done
         printf '[modules]\nbase=$(touch "%s")\n' "$TEST_ROOT/config-executed" > "$TEST_ROOT/invalid.conf"
         if "$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --config "$TEST_ROOT/invalid.conf" --modules dotfiles --non-interactive > "$TEST_ROOT/output" 2>&1; then
@@ -331,6 +345,7 @@ RELEASE
         ;;
     remote)
         source "$REPO_ROOT/lib/common.sh"
+        GITHUB_PROXY=''
         # Shorten only the fixed network timer; all processes belong to these fixtures.
         sleep() {
             if [[ "$1" == 120 ]]; then
@@ -387,6 +402,30 @@ FIXTURE
             done
         done
         unset -f sleep
+        export GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=devboom.fixture GIT_CONFIG_VALUE_0=preserved
+        GITHUB_PROXY=https://proxy.example/
+        run_git_download "$BASH_BIN" -c '
+            printf "%s\n" "$GIT_CONFIG_COUNT" > "$1/git-config-count"
+            git config --get devboom.fixture > "$1/git-config-existing"
+            git ls-remote --get-url https://github.com/example/repo.git > "$1/git-url"
+        ' fixture "$TEST_ROOT"
+        assert_equal 2 "$(cat "$TEST_ROOT/git-config-count")" 'Git prefix appends one runtime config entry'
+        assert_equal preserved "$(cat "$TEST_ROOT/git-config-existing")" 'Child Git retains the existing runtime config'
+        assert_equal 'https://proxy.example/https://github.com/example/repo.git' "$(cat "$TEST_ROOT/git-url")" 'Nested Git commands inherit the URL rewrite without network access'
+        assert_equal '1|devboom.fixture|preserved' "$GIT_CONFIG_COUNT|$GIT_CONFIG_KEY_0|$GIT_CONFIG_VALUE_0" 'Git helper preserves the parent runtime config'
+        [[ -z "${GIT_CONFIG_KEY_1-}" && -z "${GIT_CONFIG_VALUE_1-}" && ! -e "$HOME/.gitconfig" ]] || fail 'Git prefix leaked to the parent or a config file'
+        GIT_CONFIG_KEY_0=url.https://other.example/https://github.com/.insteadOf
+        GIT_CONFIG_VALUE_0=https://github.com/
+        status=0
+        run_git_download touch "$TEST_ROOT/conflicting-rewrite-executed" > "$TEST_ROOT/git-conflict.log" 2>&1 || status=$?
+        assert_equal 1 "$status" 'A competing Git rewrite is reported as a failure'
+        [[ ! -e "$TEST_ROOT/conflicting-rewrite-executed" ]] || fail 'Git helper executed a command with the wrong download prefix'
+        GIT_CONFIG_KEY_0=devboom.fixture
+        GIT_CONFIG_VALUE_0=preserved
+        GITHUB_PROXY=''
+        run_git_download git ls-remote --get-url https://github.com/example/repo.git > "$TEST_ROOT/git-url"
+        assert_equal 'https://github.com/example/repo.git' "$(cat "$TEST_ROOT/git-url")" 'An empty prefix keeps Git downloads direct'
+        unset GIT_CONFIG_COUNT GIT_CONFIG_KEY_0 GIT_CONFIG_VALUE_0
         have() { [[ "$1" == curl ]]; }
         curl() { printf '%s\n' "$*" > "$TEST_ROOT/downloader.args"; return 28; }
         status=0
@@ -408,6 +447,39 @@ FIXTURE
         assert_equal 1 "$status" 'Wget network failure is reported as a failure'
         args=$(cat "$TEST_ROOT/downloader.args")
         [[ " $args " == *' -T 30 '* && " $args " == *' -t 3 '* ]] || fail 'Wget download limits are missing'
+        wget() { printf '%s\n' "$*" > "$TEST_ROOT/downloader.args"; }
+        for downloader in curl wget; do
+            have() { [[ "$1" == "$downloader" ]]; }
+            GITHUB_PROXY=https://proxy.example/
+            for url in https://github.com/example/repo/releases/archive.tar.gz \
+                https://raw.githubusercontent.com/example/repo/main/install.sh \
+                https://astral.sh/uv/install.sh https://github.com.example.invalid/file \
+                https://proxy.example/https://github.com/example/repo/archive.tar.gz; do
+                case "$url" in
+                    https://github.com/*|https://raw.githubusercontent.com/*) expected="$GITHUB_PROXY$url" ;;
+                    *) expected=$url ;;
+                esac
+                output=$(download_file "$url" "$TEST_ROOT/download")
+                args=$(cat "$TEST_ROOT/downloader.args")
+                [[ "$args" == *" $expected" ]] || fail "$downloader routed the wrong URL: $url"
+                if [[ "$expected" != "$url" ]]; then
+                    [[ "$output" == *"$url"* && "$output" == *"$expected"* ]] || fail 'Download log omits the official or actual URL'
+                fi
+            done
+            GITHUB_PROXY=''
+            download_file https://github.com/example/repo/archive.tar.gz "$TEST_ROOT/download"
+            args=$(cat "$TEST_ROOT/downloader.args")
+            [[ "$args" == *' https://github.com/example/repo/archive.tar.gz' ]] || fail "$downloader ignored the direct-download setting"
+        done
+        have() { [[ "$1" == curl ]]; }
+        curl() { printf '%s\n' "$*" >> "$TEST_ROOT/failed-download.args"; return 28; }
+        GITHUB_PROXY=https://proxy.example/
+        status=0
+        download_file https://github.com/example/repo/archive.tar.gz "$TEST_ROOT/download" || status=$?
+        assert_equal 1 "$status" 'A proxy download failure remains a failure'
+        args=$(cat "$TEST_ROOT/failed-download.args")
+        [[ "$args" != *$'\n'* && "$args" == *' https://proxy.example/https://github.com/example/repo/archive.tar.gz' ]] || fail 'A failed proxy request retried outside the configured prefix'
+        GITHUB_PROXY=''
         download_file() { touch "$TEST_ROOT/download-called"; fail 'Unauthorized installer download'; }
         INTERACTIVE=0
         ALLOW_REMOTE=0

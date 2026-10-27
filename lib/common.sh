@@ -9,6 +9,22 @@ have() { command -v "$1" >/dev/null 2>&1; }
 run_git_download() (
     local download_pid='' timer_pid='' helper_pid pid
     local -x GIT_TERMINAL_PROMPT=0 GIT_HTTP_LOW_SPEED_LIMIT=1 GIT_HTTP_LOW_SPEED_TIME=30
+    if [[ -n "${GITHUB_PROXY:-}" ]]; then
+        local config_count=${GIT_CONFIG_COUNT:-0}
+        if [[ ! "$config_count" =~ ^[0-9]+$ ]]; then
+            log_error 'GIT_CONFIG_COUNT must be a non-negative integer.'
+            return 1
+        fi
+        config_count=$((10#$config_count))
+        export "GIT_CONFIG_KEY_$config_count=url.${GITHUB_PROXY}https://github.com/.insteadOf"
+        export "GIT_CONFIG_VALUE_$config_count=https://github.com/"
+        export GIT_CONFIG_COUNT=$((config_count + 1))
+        if [[ "$(git ls-remote --get-url https://github.com/)" != "${GITHUB_PROXY}https://github.com/" ]]; then
+            log_error 'Cannot apply GitHub proxy; use Git 2.31+, resolve conflicting Git URL rewrites, or leave github_proxy empty.'
+            return 1
+        fi
+        log_info "GitHub Git 加速前缀：$GITHUB_PROXY" >&2
+    fi
     helper_pid=$(exec /bin/sh -c 'printf "%s\n" "$PPID"')
     trap '
         trap "" HUP INT TERM ALRM
@@ -39,15 +55,24 @@ run_git_download() (
 )
 
 download_file() {
-    local total_timeout=${3:-300}
+    local total_timeout=${3:-300} url=$1
+    case "$url" in
+        https://github.com/*|https://raw.githubusercontent.com/*)
+            if [[ -n "${GITHUB_PROXY:-}" ]]; then
+                log_info "下载来源：$url"
+                url="$GITHUB_PROXY$url"
+                log_info "加速请求：$url"
+            fi
+            ;;
+    esac
     if have curl; then
         curl --fail --location --proto '=https' --tlsv1.2 \
             --connect-timeout 15 --speed-limit 1 --speed-time 60 \
             --max-time "$total_timeout" --retry 2 --retry-max-time 300 \
-            --output "$2" "$1" || { log_error "Download failed or timed out: $1"; return 1; }
+            --output "$2" "$url" || { log_error "Download failed or timed out: $url"; return 1; }
     elif have wget; then
         # -T/-t also work with BusyBox wget (-t is ignored there; it does not retry).
-        wget -T 30 -t 3 -O "$2" "$1" || { log_error "Download failed or timed out: $1"; return 1; }
+        wget -T 30 -t 3 -O "$2" "$url" || { log_error "Download failed or timed out: $url"; return 1; }
     else
         log_warn 'Download requires curl or wget; select the base module first.'
         return 2

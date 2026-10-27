@@ -9,6 +9,7 @@ load_install_config() {
     TOOLS=''
     ALLOW_REMOTE=0
     CONFLICT_POLICY=skip
+    GITHUB_PROXY=''
     if [[ ! -f "$file" || ! -r "$file" ]]; then
         log_error "Cannot read installation config: $file"
         return 1
@@ -53,7 +54,7 @@ load_install_config() {
                 ;;
             options)
                 case "$key" in
-                    allow_remote|conflict) ;;
+                    allow_remote|conflict|github_proxy) ;;
                     *) log_error "$file:$line_number: Unknown option: $key"; return 1 ;;
                 esac
                 ;;
@@ -68,6 +69,12 @@ load_install_config() {
                 skip|backup) CONFLICT_POLICY=$value ;;
                 *) log_error "$file:$line_number: conflict must be skip or backup"; return 1 ;;
             esac
+        elif [[ "$section:$key" == options:github_proxy ]]; then
+            if [[ -n "$value" && ! "$value" =~ ^https://[^/:@?[:space:]]+(:[0-9]+)?/([^@?[:space:]]*/)?$ ]]; then
+                log_error "$file:$line_number: github_proxy must be empty or an HTTPS URL prefix ending in /, without credentials, spaces or query parameters"
+                return 1
+            fi
+            GITHUB_PROXY=$value
         else
             case "$value" in
                 true)

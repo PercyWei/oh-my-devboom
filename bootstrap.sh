@@ -120,6 +120,11 @@ print_install_plan() {
     done
     case " $MODULES " in *' tools '*) ;; *) log_info '可选开发工具：未启用 tools 模块。' ;; esac
     log_info "配置冲突策略：$CONFLICT_POLICY"
+    if [[ -n "$GITHUB_PROXY" ]]; then
+        log_info "GitHub 加速前缀：$GITHUB_PROXY"
+    else
+        log_info 'GitHub 下载：直连。'
+    fi
     log_info '上游下载授权范围：Homebrew/uv 安装脚本；Antidote 与 Zsh 补全、自动建议、语法高亮插件；Powerlevel10k 主题、gitstatusd 和 Zellij 发布包。'
     if [[ "$ALLOW_REMOTE" == 1 ]]; then
         log_info '上述内容：已授权直接下载并执行或加载。'
