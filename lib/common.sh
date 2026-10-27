@@ -39,9 +39,11 @@ run_git_download() (
 )
 
 download_file() {
+    local total_timeout=${3:-300}
     if have curl; then
         curl --fail --location --proto '=https' --tlsv1.2 \
-            --connect-timeout 15 --max-time 300 --retry 2 --retry-max-time 300 \
+            --connect-timeout 15 --speed-limit 1 --speed-time 60 \
+            --max-time "$total_timeout" --retry 2 --retry-max-time 300 \
             --output "$2" "$1" || { log_error "Download failed or timed out: $1"; return 1; }
     elif have wget; then
         # -T/-t also work with BusyBox wget (-t is ignored there; it does not retry).
@@ -57,10 +59,10 @@ approve_remote() {
     log_info "$label source: $source_url"
     if [ "$ALLOW_REMOTE" -eq 1 ]; then return 0; fi
     if [ "$INTERACTIVE" -eq 0 ]; then
-        log_warn "$label skipped: remote code requires --allow-remote."
+        log_warn "$label skipped: direct upstream downloads require allow_remote=true or --allow-remote."
         return 2
     fi
-    printf 'Authorize remote code for %s? [y/N] ' "$label"
+    printf 'Authorize installation of %s from the source above? [y/N] ' "$label"
     IFS= read -r answer || return 2
     case "$answer" in y|Y|yes|YES) return 0 ;; *) log_warn "$label skipped."; return 2 ;; esac
 }

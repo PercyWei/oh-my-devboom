@@ -53,15 +53,15 @@ _devboom_init_completion() {
     compinit -i -d "$XDG_CACHE_HOME/oh-my-devboom/zcompdump"
     zstyle ':completion:*' menu select
     if (( $+commands[fzf] )); then
-        local fzf_init
+        local fzf_init fzf_dir="$XDG_DATA_HOME/oh-my-devboom/fzf"
         if fzf_init="$(fzf --zsh 2>/dev/null)"; then
             eval "$fzf_init"
-        elif [[ -r /usr/share/doc/fzf/examples/completion.zsh &&
-                -r /usr/share/doc/fzf/examples/key-bindings.zsh ]]; then
-            source /usr/share/doc/fzf/examples/completion.zsh
-            source /usr/share/doc/fzf/examples/key-bindings.zsh
+        elif [[ -r "$fzf_dir/fzf-version" && "$(<"$fzf_dir/fzf-version")" == "$(fzf --version)" &&
+                -r "$fzf_dir/completion.zsh" && -r "$fzf_dir/key-bindings.zsh" ]]; then
+            source "$fzf_dir/completion.zsh"
+            source "$fzf_dir/key-bindings.zsh"
         else
-            print -u2 -- '[warn] fzf 不支持 --zsh，且未找到系统集成脚本；请升级 fzf 以启用补全和快捷键。'
+            print -u2 -- '[warn] fzf 的 Zsh 集成尚未准备；请运行 bootstrap.sh --non-interactive --modules tools --tools fzf。'
         fi
     fi
     if (( $+commands[zoxide] )); then
