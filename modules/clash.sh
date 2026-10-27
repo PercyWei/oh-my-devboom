@@ -6,6 +6,9 @@ module_clash() {
     local commit=e38d643725594c38c3fb02f355a2c89eba9c296c
     local source_url="https://gitee.com/back_door/clashctl/repository/archive/$commit.tar.gz"
     local archive_sha256=172e68840d6b81e454950f90e81439fc0ca424e589b1f2f5de36aa9a39d12fef
+    local mihomo_version=v1.19.33 yq_version=v4.54.1
+    local packages_url="https://gitee.com/back_door/clashctl/releases/download/mihomo-$mihomo_version-yq-$yq_version"
+    local mihomo_file yq_file mihomo_sha256 yq_sha256 component package_file package_sha256 archive_file
     local complete=0 result=0 RECORD_PACKAGE_RESULTS=0
     local env_file name value proxy_values=() dependencies=(curl tar gzip unzip sha256sum shuf od timeout)
     local proxy_names=(http_proxy HTTP_PROXY https_proxy HTTPS_PROXY all_proxy ALL_PROXY no_proxy NO_PROXY)
@@ -46,8 +49,23 @@ module_clash() {
         fi
     fi
     if [[ "$complete" == 0 ]]; then
-        approve_remote 'clashctl、Mihomo 和 yq' \
-            "$source_url；https://github.com/MetaCubeX/mihomo；https://github.com/mikefarah/yq" || return 1
+        case "$ARCH" in
+            x86_64)
+                mihomo_file="mihomo-linux-amd64-v1-$mihomo_version.gz"
+                mihomo_sha256=8ec92e7b2fdc6b853ba00156bab7e4e965c8b0d843b8c4ac8ab98795f02ad524
+                yq_file=yq_linux_amd64.tar.gz
+                yq_sha256=e68a456f90c577af3fe4960184b3a3cf5c461e0348407c10f107da3a5fec8972
+                ;;
+            aarch64)
+                mihomo_file="mihomo-linux-arm64-$mihomo_version.gz"
+                mihomo_sha256=ba408b317080ee265c46cb923a50018c1b82cbd708551cdd46a1e3e307396187
+                yq_file=yq_linux_arm64.tar.gz
+                yq_sha256=8c27f6e7476fb5acefb9352e3d30f6bc2dc93f1956eb92e8da727173fb7ec6d3
+                ;;
+            *) record_result failed Clash "Gitee 安装包不支持当前架构：$ARCH"; return 1 ;;
+        esac
+        approve_remote "clashctl、Mihomo $mihomo_version 和 yq $yq_version" \
+            "$source_url；$packages_url/$mihomo_file；$packages_url/$yq_file" || return 1
     fi
 
     # 代理建立前只准备它自身所需的系统命令；Alpine 的 BusyBox 不能替代 GNU 工具。
@@ -81,9 +99,23 @@ module_clash() {
                 log_error 'clashctl 源码 SHA256 校验失败，未运行安装器。'
                 exit 1
             fi
+            mkdir -m 700 "$staging/archives" || exit 1
+            for component in mihomo yq; do
+                case "$component" in
+                    mihomo) package_file=$mihomo_file; package_sha256=$mihomo_sha256; archive_file=$mihomo_file ;;
+                    yq) package_file=$yq_file; package_sha256=$yq_sha256; archive_file="yq-$yq_version-$ARCH.tar.gz" ;;
+                esac
+                log_info "下载 $component 安装包：$packages_url/$package_file"
+                download_file "$packages_url/$package_file" "$staging/archives/$archive_file" || exit 1
+                checksum=$(sha256sum "$staging/archives/$archive_file") || exit 1
+                if [[ "${checksum%% *}" != "$package_sha256" ]]; then
+                    log_error "$component 安装包 SHA256 校验失败，未运行安装器。"
+                    exit 1
+                fi
+            done
             mkdir "$staging/source" &&
                 tar -xzf "$staging/source.tar.gz" --strip-components=1 -C "$staging/source" || exit 1
-            # 固定源码的三处集成适配：本仓库管理 rc、控制接口仅本地、关闭自动面板下载。
+            # 本仓库管理 rc，控制接口仅本地，并关闭自动面板下载。
             awk '
                 /^detect_rc\(\) \{$/ {
                     print
@@ -95,9 +127,28 @@ module_clash() {
                 { print }
             ' "$staging/source/scripts/lib/common.sh" > "$staging/common.sh" &&
                 mv "$staging/common.sh" "$staging/source/scripts/lib/common.sh" || exit 1
+            # 仅本次安装使用已校验归档，跳过 yq 的 GitHub 最新版本查询。
+            awk -v yq_version="$yq_version" '
+                /^ZIP_BASE_DIR=/ {
+                    print "ZIP_BASE_DIR=\"${CLASHCTL_BOOTSTRAP_ARCHIVES:-${CLASHCTL_SRC}/archives}\""
+                    next
+                }
+                /^_resolve_version\(\) \{$/ {
+                    print
+                    print "    if [ \"$1\" = VERSION_YQ ] && [ -n \"${CLASHCTL_BOOTSTRAP_ARCHIVES:-}\" ]; then"
+                    print "        VERSION_YQ=" yq_version
+                    print "        VERSION_YQ_SOURCE=\"Gitee 镜像\""
+                    print "        return 0"
+                    print "    fi"
+                    next
+                }
+                { print }
+            ' "$staging/source/scripts/preflight.sh" > "$staging/preflight.sh" &&
+                mv "$staging/preflight.sh" "$staging/source/scripts/preflight.sh" || exit 1
             sed -i 's/^external-controller:.*/external-controller: "127.0.0.1:9090"/; s/^external-ui-url:.*/external-ui-url: ""/; s/^external-ui:.*/external-ui: ""/' \
                 "$staging/source/resources/mixin.yaml.example" || exit 1
-            CI=1 CLASHCTL_DOWNLOAD_TIMEOUT=300 bash "$staging/source/install.sh" --local \
+            CI=1 CLASHCTL_DOWNLOAD_TIMEOUT=300 CLASHCTL_BOOTSTRAP_ARCHIVES="$staging/archives" \
+                bash "$staging/source/install.sh" --local \
                 --home "$clash_dir" --kernel mihomo --service "$service" --gh-proxy "${GITHUB_PROXY:-}" || exit 1
         ); then
             record_result failed Clash "clashctl 安装未完成：$clash_dir" '检查上方下载、权限或服务错误后重试，已安装的数据会保留。'
