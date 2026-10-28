@@ -17,12 +17,13 @@ Set up a personal development environment on Linux or macOS (Bash 3.2+).
   --config FILE     Installation settings (default: config/default.conf)
   --modules LIST    Override modules: clash,base,homebrew,zsh,powerlevel10k,tools,dotfiles,shell
                     Comma-separated names, or all.
-  --tools LIST      Override tools: uv,fzf,rg,bat,eza,zoxide,zellij,nvtop,jq,fd
+  --tools LIST      Override tools: uv,fzf,rg,bat,eza,zoxide,zellij,nvtop,jq,fd,gh
                     Comma-separated names, or all. Requires the tools module.
   --non-interactive Run without prompts; required when stdin is not a terminal
   --allow-remote    Authorize direct upstream downloads and execution:
                     clashctl and its Mihomo/yq components;
-                    Homebrew/uv installers; Antidote and Zsh plugins;
+                    Homebrew/uv installers; Antidote, use-omz and Oh My Zsh Git;
+                    Zsh completions, suggestions and highlighting;
                     Powerlevel10k theme, gitstatusd and Zellij release binaries.
                     Package-manager installs and local config copies are unaffected.
   --conflict POLICY Override config conflicts: skip or backup before copying
@@ -46,7 +47,7 @@ list_modules() {
 clash      Enable Clash from a local YAML file; stop it when done (Linux only)
 base       Install git, curl, wget, vim, unzip and zsh
 homebrew   Install Homebrew when its host requirements are met
-zsh        Zsh Augmented: Antidote, completions, suggestions and highlighting
+zsh        Zsh Augmented: Antidote, Git aliases, completions, suggestions and highlighting
 powerlevel10k Install the Powerlevel10k Zsh prompt
 tools      Install selected optional developer tools
 dotfiles   Copy base configuration and settings for available components
@@ -118,7 +119,7 @@ print_install_plan() {
             clash) printf '  clash: clashctl、Mihomo、yq（Linux；配置：%s）\n' "${CLASH_CONFIG_FILE:-未填写 [clash] config_file}" ;;
             base) printf '  base: git、curl、wget、vim、unzip、zsh\n' ;;
             homebrew) printf '  homebrew: Homebrew（不满足安装条件时跳过）\n' ;;
-            zsh) printf '  zsh: Zsh Augmented · Antidote、补全、自动建议、语法高亮\n' ;;
+            zsh) printf '  zsh: Zsh Augmented · Antidote、Git 别名、补全、自动建议、语法高亮\n' ;;
             powerlevel10k) printf '  powerlevel10k: Powerlevel10k、gitstatusd\n' ;;
             tools) printf '  tools: %s\n' "${TOOLS:-未选择工具}" ;;
             dotfiles) printf '  dotfiles: 基础配置及已就绪组件的配置片段\n' ;;
@@ -137,7 +138,7 @@ print_install_plan() {
         log_info 'GitHub 下载：直连。'
     fi
     log_info "Git 下载超时：${GIT_TIMEOUT} 秒"
-    log_info '上游下载授权范围：clashctl 及其 Mihomo/yq 组件；Homebrew/uv 安装脚本；Antidote 与 Zsh 补全、自动建议、语法高亮插件；Powerlevel10k 主题、gitstatusd 和 Zellij 发布包。'
+    log_info '上游下载授权范围：clashctl 及其 Mihomo/yq 组件；Homebrew/uv 安装脚本；Antidote、use-omz、Oh My Zsh Git 及补全、自动建议、语法高亮插件；Powerlevel10k 主题、gitstatusd 和 Zellij 发布包。'
     if [[ "$ALLOW_REMOTE" == 1 ]]; then
         log_info '上述内容：已授权直接下载并执行或加载。'
     else

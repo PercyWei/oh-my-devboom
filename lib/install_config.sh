@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 AVAILABLE_MODULES='clash base homebrew zsh powerlevel10k tools dotfiles shell'
-AVAILABLE_TOOLS='uv fzf rg bat eza zoxide zellij nvtop jq fd'
+AVAILABLE_TOOLS='uv fzf rg bat eza zoxide zellij nvtop jq fd gh'
 
 load_install_config() {
     local file=$1 line section='' key value line_number=0 seen=' '

@@ -42,6 +42,12 @@ ensure_packages() {
                 esac
                 ;;
             rg) package=ripgrep ;;
+            gh)
+                case "$PACKAGE_MANAGER" in
+                    pacman|apk) package=github-cli ;;
+                    *) package=gh ;;
+                esac
+                ;;
             fd)
                 case "$PACKAGE_MANAGER" in
                     apt-get|dnf|yum) package=fd-find ;;

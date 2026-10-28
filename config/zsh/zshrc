@@ -25,7 +25,7 @@ alias ll='ls -lh'
 alias la='ls -lah'
 PROMPT='%n@%m:%~%# '
 
-for _devboom_module in homebrew clash eza bat fd; do
+for _devboom_module in homebrew clash eza bat fd zellij; do
     if [[ -r "$_devboom_zsh_dir/$_devboom_module.zsh" ]]; then
         source "$_devboom_zsh_dir/$_devboom_module.zsh"
     fi
@@ -35,7 +35,8 @@ done
 typeset -g _devboom_shell_initialized=0
 _devboom_init_completion() {
     local module
-    autoload -Uz compinit
+    # 保留 use-omz 的包装器，由它重放 Git 插件排队的补全定义。
+    (( $+functions[compinit] )) || autoload -Uz compinit
     compinit -i -d "$XDG_CACHE_HOME/oh-my-devboom/zcompdump"
     zstyle ':completion:*' menu select
     for module in fzf zoxide; do

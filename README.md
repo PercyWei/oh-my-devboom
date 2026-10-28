@@ -40,7 +40,7 @@ bash bootstrap.sh --config config/local.conf
 | `clash` | clashctl、Mihomo 和 yq；使用本地 YAML，在安装期间提供代理，仅支持 Linux |
 | `base` | git、curl、wget、vim、unzip、zsh |
 | `homebrew` | 安装或复用 Homebrew，并配置 PATH |
-| `zsh` | Antidote、zsh-completions、zsh-autosuggestions、zsh-syntax-highlighting |
+| `zsh` | Antidote、Oh My Zsh Git 插件、zsh-completions、zsh-autosuggestions、zsh-syntax-highlighting |
 | `powerlevel10k` | Powerlevel10k 主题、gitstatusd 和个人主题预设 |
 | `tools` | 下表中的开发工具 |
 | `dotfiles` | 复制基础 Shell/Git 配置，按已就绪组件部署可选配置片段 |
@@ -54,14 +54,17 @@ bash bootstrap.sh --config config/local.conf
 | bat | 带语法高亮地查看文件 |
 | eza | 增强文件列表，提供 `ll`、`la` 别名 |
 | zoxide | 使用 `z`、`zi` 快速跳转目录 |
-| Zellij（`zellij`） | 终端分屏、标签页与持久会话 |
+| Zellij（`zellij`） | 终端分屏、标签页与持久会话，别名 `zj` |
 | NVTOP（`nvtop`） | GPU 利用率、显存和进程监控 |
 | jq | JSON 筛选、转换与格式化 |
 | fd | 按文件名、扩展名和类型查找文件 |
+| GitHub CLI（`gh`） | 管理 GitHub 仓库、Issue 和 Pull Request |
 
 Linux 使用 `apt-get`、`dnf`、`yum`、`pacman`、`zypper` 或 `apk`，macOS 使用 Homebrew。root 跳过 Homebrew；Linux 容器不新装 Homebrew。系统包安装需要 root 或 sudo，权限不足或包不可用时会提示。
 
 NVTOP 需要 GPU 驱动及设备访问权限，容器需暴露 GPU；macOS 仅支持 Apple GPU。Debian/Ubuntu 的 `batcat`、`fdfind` 会按需配置为 `bat`、`fd` 别名。
+
+`gh` 通过现有软件源安装，使用前运行 `gh auth login` 登录 GitHub；升级可参考[官方安装说明](https://github.com/cli/cli/blob/trunk/docs/install_linux.md)。
 
 ## 按需安装
 
@@ -86,6 +89,9 @@ bash bootstrap.sh --config config/local.conf --non-interactive --allow-remote
 
 # 仅安装 jq 和 fd
 bash bootstrap.sh --non-interactive --modules tools --tools jq,fd
+
+# 仅安装 GitHub CLI
+bash bootstrap.sh --non-interactive --modules tools --tools gh
 
 # 选择全部模块和工具；Linux 仍需配置 Clash YAML
 bash bootstrap.sh --config config/local.conf --modules all --tools all
@@ -115,6 +121,8 @@ bash bootstrap.sh --list-modules
 
 基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，安装新工具后重跑 `dotfiles` 接入。修改插件清单后，重跑 `zsh` 模块生成静态配置；主题可直接修改 `.p10k.zsh` 或运行 `p10k configure`。
 
+Antidote 通过 `use-omz` 加载 Oh My Zsh Git 插件及必要依赖，提供 `gst`（`git status`）、`gp`（`git push`）、`ga`（`git add`）等别名。Zellij 就绪时部署独立片段，使用 `zj` 启动。
+
 部署规则：
 
 - 目标不存在时复制，普通文件内容相同时跳过。
@@ -132,6 +140,16 @@ bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
 ```
 
 已有 `.zshrc` 需按上述规则更新后才能加载模块片段。恢复备份时，将日志中的备份文件移回原位置。
+
+已有环境更新 Git 插件和别名时，先部署配置，再生成插件静态文件：
+
+```bash
+bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
+bash bootstrap.sh --non-interactive --modules zsh --allow-remote
+exec zsh
+```
+
+需要 Clash 代理时，第二步改用 `--config config/local.conf --modules clash,zsh`。
 
 个人 Git 身份单独保存在 `~/.gitconfig.local`：
 

@@ -1,5 +1,8 @@
 # 使用 Antidote 的 pin 锁定提交。修改后重跑 bootstrap.sh --modules zsh。
-# completion post hook 确保 compinit、fzf、zoxide 先于后续插件初始化。
+# use-omz 按需加载 Oh My Zsh 依赖；Git 补全先入队，再由 compinit 初始化。
+getantidote/use-omz pin:317648f75d2643abcd7cf580062a8999b11473d7
+ohmyzsh/ohmyzsh path:plugins/git pin:d2b7f557cceaddb16ba89bbf8200d8a8df35c4d8
+# completion post hook 确保 compinit、fzf、zoxide 先于自动建议和语法高亮。
 zsh-users/zsh-completions kind:fpath path:src post:_devboom_init_completion pin:28c5bdcaf81bb89e56d0df8267d822c3b8aed9e0
 zsh-users/zsh-autosuggestions pin:e52ee8ca55bcc56a17c828767a3f98f22a68d4eb
 zsh-users/zsh-syntax-highlighting pin:b1379f1ee96b1fe25701c9418c75f81eaabdab56

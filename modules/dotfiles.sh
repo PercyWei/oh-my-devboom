@@ -9,7 +9,7 @@ module_dotfiles() {
         daemon_os=darwin
         [[ "$ARCH" != aarch64 ]] || daemon_arch=arm64
     fi
-    for pair in zshrc git plugin-list powerlevel10k-preset homebrew clash eza bat fd fzf zoxide plugins powerlevel10k-instant powerlevel10k; do
+    for pair in zshrc git plugin-list powerlevel10k-preset homebrew clash eza bat fd zellij fzf zoxide plugins powerlevel10k-instant powerlevel10k; do
         source="$ROOT_DIR/config/zsh/modules/$pair.zsh"
         destination="$config_dir/$pair.zsh"
         ready=0
@@ -39,7 +39,7 @@ module_dotfiles() {
                       -r "$XDG_DATA_HOME/clashctl/.clashctl-format" &&
                       "$(cat "$XDG_DATA_HOME/clashctl/.clashctl-format")" == 1 ]]; then ready=1; fi
                 ;;
-            eza|zoxide) if have "$pair"; then ready=1; fi ;;
+            eza|zoxide|zellij) if have "$pair"; then ready=1; fi ;;
             bat) if ! have bat && have batcat; then ready=1; fi ;;
             fd) if ! have fd && have fdfind; then ready=1; fi ;;
             fzf) if have fzf && [[ -r "$data_dir/fzf/init.zsh" ]]; then ready=1; fi ;;

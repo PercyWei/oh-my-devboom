@@ -106,7 +106,7 @@ RELEASE
         source "$REPO_ROOT/bootstrap.sh"
         parse_args --non-interactive
         assert_equal 'clash base homebrew zsh powerlevel10k tools dotfiles shell' "$MODULES" 'Default config enables Clash first and login shell setup last'
-        assert_equal 'fzf rg bat eza zoxide nvtop jq fd uv zellij' "$TOOLS" 'Default tools follow the grouped config order'
+        assert_equal 'fzf rg bat eza zoxide nvtop jq fd gh uv zellij' "$TOOLS" 'Default tools follow the grouped config order'
         assert_equal 'https://ghfast.top/' "$GITHUB_PROXY" 'Default config selects the GitHub download prefix'
         assert_equal 600 "$GIT_TIMEOUT" 'Default Git download timeout is ten minutes'
         assert_equal '' "$CLASH_CONFIG_FILE" 'Default config requires a user-provided Clash YAML path'
@@ -114,8 +114,8 @@ RELEASE
         assert_equal powerlevel10k "$MODULES" 'Powerlevel10k module is accepted'
         parse_args --modules shell --non-interactive
         assert_equal shell "$MODULES" 'Login shell setup can be selected independently'
-        parse_args --modules tools --tools zellij,nvtop,jq,fd --non-interactive
-        assert_equal 'zellij nvtop jq fd' "$TOOLS" 'Zellij, nvtop, jq and fd are accepted tools'
+        parse_args --modules tools --tools zellij,nvtop,jq,fd,gh --non-interactive
+        assert_equal 'zellij nvtop jq fd gh' "$TOOLS" 'Zellij, nvtop, jq, fd and gh are accepted tools'
         parse_args --modules all --tools all --non-interactive
         assert_equal "$AVAILABLE_MODULES" "$MODULES" 'all selects every module'
         assert_equal "$AVAILABLE_TOOLS" "$TOOLS" 'all selects every optional tool'
