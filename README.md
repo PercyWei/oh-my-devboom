@@ -365,44 +365,14 @@ git ls-files -z '*.sh' | xargs -0 shellcheck --severity=warning
 
 CI 在 Ubuntu 与 macOS 上准备检查工具并输出实际版本，保留 macOS `/bin/bash` 的 Bash 3.2 验证。现有检查使用临时 HOME 和模拟的包管理、下载命令；Clash 完整安装、终端交互和 GPU 展示仍需在目标环境验证。
 
-### 更新仓库固定版本
+### 版本与镜像维护
 
-`scripts/update-pins.sh` 使用 Git、curl、jq、tar 和 shasum 核对上游，再更新对应安装模块或默认插件清单。目标文件需没有未提交修改。以下示例使用当前固定值，维护时替换为已审阅的目标版本或引用：
-
-```bash
-bash scripts/update-pins.sh zellij v0.45.1
-bash scripts/update-pins.sh powerlevel10k d05a1b00f9a61f9578bf9dc19b8451942dde8734
-bash scripts/update-pins.sh antidote v2.3.0
-bash scripts/update-pins.sh plugin zsh-users/zsh-syntax-highlighting 0.8.0
-```
-
-| 对象 | 写入前的核对 |
-| --- | --- |
-| Zellij | 稳定 Release、四个平台资产的官方摘要及归档成员 |
-| Powerlevel10k | Git commit、所选主题 `gitstatus/install.info` 中四个平台的配套版本与归档；gitstatus 不单独升级 |
-| Antidote | 稳定 tag 对应的实际 commit 和安装接口 |
-| 默认插件 | 清单中已有仓库的 Git 引用，实际解析为 commit 并检出 |
-
-脚本仅更新仓库文件。随后审阅 `git diff`、核对文档与上游接口，并在隔离环境验证安装及重复执行。用户插件清单中的 pin 仍需手动同步。
-
-<details>
-<summary>维护 Clash 的 GitHub / Gitee 镜像</summary>
-
-需要 Git、gh、官方 gitee CLI、jq、curl 和 shasum；`gh`、`gitee` 分别登录 `PercyWei`、`back_door`。`GITEE_BIN` 可指定 Gitee CLI 的绝对路径，`CLASHCTL_REPO_DIR` 可指定本地克隆目录，默认使用仓库同级的 `clashctl`。
+只读比较固定值，或批量更新并确认计划；每个组件可指定版本，省略时自动发现最新目标：
 
 ```bash
-# 同步上游 master，不改变安装固定版本
-bash scripts/update-clash.sh sync
-
-# 同步后固定指定提交及源码归档摘要
-bash scripts/update-clash.sh source e38d643725594c38c3fb02f355a2c89eba9c296c
-
-# 发布指定稳定版本的组件包
-bash scripts/update-clash.sh packages v1.19.33 v4.54.1
+bash scripts/update-pins.sh check all
+bash scripts/update-pins.sh update zellij v0.45.1 powerlevel10k
+bash scripts/update-pins.sh update all
 ```
 
-`packages` 按官方 Release 摘要校验安装包，发布或复用 Gitee 附件，经匿名下载核对后更新本地固定值、README 和默认配置。旧附件保留，相同内容复用，不同内容报错。
-
-`source`、`packages` 要求 `modules/clash.sh`、`README.md`、`config/default.conf` 无未提交修改。脚本不安装或升级服务器，也不提交变更。
-
-</details>
+检查不改写文件；更新会先校验全部所选项，展示计划并确认后写入对应仓库文件。`update all` 覆盖 Zellij、Powerlevel10k、Antidote 和默认插件；Clash 通过专用镜像流程维护。完整用法见 [scripts/README.md](scripts/README.md)。
