@@ -216,7 +216,6 @@ module_tools() {
                 UV_INSTALL_DIR="$HOME/.local/bin" UV_NO_MODIFY_PATH=1 \
                     run_remote_installer uv https://astral.sh/uv/install.sh || result=$?
                 if [[ "$result" == 0 ]]; then
-                    export PATH="$HOME/.local/bin:$PATH"
                     if have uv; then
                         record_result installed uv "已通过 Astral 安装器安装，命令路径：$(command -v uv)"
                     else

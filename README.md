@@ -68,13 +68,15 @@ Zsh 本体由 `base` 安装，`antidote` 准备插件管理器和清单，`shell
 
 Linux 使用 `apt-get`、`dnf`、`yum`、`pacman`、`zypper` 或 `apk`，macOS 使用 Homebrew。root 跳过 Homebrew；Linux 容器不新装 Homebrew。系统包安装需要 root 或 sudo，权限不足或包不可用时会提示。
 
+安装和 Zsh 初始化都优先使用 PATH 中的 `brew`，未找到时再搜索标准安装目录。
+
 NVTOP 需要 GPU 驱动及设备访问权限，容器需暴露 GPU；macOS 仅支持 Apple GPU。Debian/Ubuntu 的 `batcat`、`fdfind` 会按需配置为 `bat`、`fd` 别名。
 
 `gh` 通过现有软件源安装，使用前运行 `gh auth login` 登录 GitHub；升级可参考[官方安装说明](https://github.com/cli/cli/blob/trunk/docs/install_linux.md)。
 
 两个 Hub 工具通过 `uv tool install` 安装到隔离环境，命令放在 `~/.local/bin`；选择任一项会先安装或复用 uv。优先使用已有的 Python ≥3.10，缺失时由 uv 下载。项目中的 Python 代码仍需在自己的环境中声明和安装依赖。
 
-按需使用 `ms-hub login`、`hf auth login` 登录；升级运行 `uv tool upgrade modelscope-hub huggingface-hub`。
+安装后用 `dotfiles` 接入配置并运行 `exec zsh`，再按需使用 `ms-hub login`、`hf auth login` 登录，确保 Hugging Face 使用配置的持久凭据路径。升级运行 `uv tool upgrade modelscope-hub huggingface-hub`。
 
 ## 按需安装
 
@@ -105,8 +107,8 @@ bash bootstrap.sh --non-interactive --modules tools --tools jq,fd
 # 仅安装 GitHub CLI
 bash bootstrap.sh --non-interactive --modules tools --tools gh
 
-# 使用 uv 安装两个 Hub 工具；首次安装 uv 时需下载授权
-bash bootstrap.sh --non-interactive --modules tools --tools modelscope-hub,huggingface-hub --allow-remote
+# 使用 uv 安装两个 Hub 工具并接入配置；首次安装 uv 时需下载授权
+bash bootstrap.sh --non-interactive --modules tools,dotfiles --tools modelscope-hub,huggingface-hub --allow-remote
 
 # 选择全部模块和工具；Linux 仍需配置 Clash YAML
 bash bootstrap.sh --config config/local.conf --modules all --tools all
@@ -117,6 +119,8 @@ bash bootstrap.sh --list-modules
 ```
 
 `--modules` 和 `--tools` 接受逗号分隔的名称或 `all`；`--tools` 需配合 `tools` 模块使用。
+
+Hub 示例要求已安装 Zsh；全新环境可将模块列表改为 `base,tools,dotfiles`。已有 `.zshrc` 按 `skip` / `backup` 冲突策略处理，需确认它已加载本项目的配置片段，再启动 Zsh 登录 Hub。
 
 `--non-interactive` 仅关闭输入提示。直接上游下载需另外设置 `allow_remote=true` 或传入 `--allow-remote`，范围包括：clashctl 及 Mihomo/yq、Homebrew/uv 安装脚本、Antidote 和 Zsh 插件、Powerlevel10k/gitstatusd、Zellij 发布包。未授权时交互确认，非交互跳过；包管理器安装和本地配置部署不受此开关限制。
 
@@ -138,7 +142,7 @@ bash bootstrap.sh --list-modules
 
 基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序，仅加载存在的片段。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，片段只保留可选文件、缓存和实际功能分支的判断。安装新工具后重跑 `dotfiles` 接入。
 
-Powerlevel10k 先加载固定版本主题自带的 lean 模板，再加载 `~/.p10k.zsh` 并刷新提示符。仓库只维护个人差异，可直接编辑该文件；升级主题时需核对覆盖项。`p10k configure` 会将完整配置写入同一用户文件，主题目录中的模板保持不变。
+Powerlevel10k 先加载固定版本主题自带的 lean 模板，再加载 `~/.p10k.zsh`，个人覆盖在首次提示符显示前生效。仓库只维护个人差异，可直接编辑该文件；升级主题时需核对覆盖项。`p10k configure` 会将完整配置写入同一用户文件，主题目录中的模板保持不变。
 
 `gitstatusd` 安装在 `${XDG_DATA_HOME:-$HOME/.local/share}/oh-my-devboom/gitstatus/`。Zsh 通过上游变量 `GITSTATUS_CACHE_DIR` 指向该数据目录，并设置 `GITSTATUS_AUTO_INSTALL=0`，由 bootstrap 负责安装。
 
@@ -152,6 +156,8 @@ exec zsh
 ```
 
 默认清单用 `pin` 锁定提交，更新命令会跳过这些插件；修改或移除对应 `pin` 后重启 Zsh，再按需更新。
+
+已有清单由用户维护。需要采用[仓库清单](config/zsh/zsh_plugins.txt)中的固定提交时，手动同步 `${ZDOTDIR:-$HOME}/.zsh_plugins.txt` 中对应的 `pin`，再运行 `exec zsh`。
 
 Antidote 通过 `use-omz` 加载 Oh My Zsh Git 插件及必要依赖，提供 `gst`（`git status`）、`gp`（`git push`）、`ga`（`git add`）等别名。Zellij 就绪时部署独立片段，使用 `zj` 启动。
 

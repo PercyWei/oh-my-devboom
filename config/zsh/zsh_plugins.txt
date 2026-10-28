@@ -5,4 +5,4 @@ ohmyzsh/ohmyzsh path:plugins/git pin:d2b7f557cceaddb16ba89bbf8200d8a8df35c4d8
 # completion post hook 确保 compinit、fzf、zoxide 先于自动建议和语法高亮。
 zsh-users/zsh-completions kind:fpath path:src post:_devboom_init_completion pin:28c5bdcaf81bb89e56d0df8267d822c3b8aed9e0
 zsh-users/zsh-autosuggestions pin:e52ee8ca55bcc56a17c828767a3f98f22a68d4eb
-zsh-users/zsh-syntax-highlighting pin:b1379f1ee96b1fe25701c9418c75f81eaabdab56
+zsh-users/zsh-syntax-highlighting pin:db085e4661f6aafd24e5acb5b2e17e4dd5dddf3e
