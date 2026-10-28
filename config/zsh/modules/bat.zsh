@@ -1,3 +1,3 @@
-if ! (( $+commands[bat] )) && (( $+commands[batcat] )); then
+if ! (( $+commands[bat] )); then
     alias bat=batcat
 fi

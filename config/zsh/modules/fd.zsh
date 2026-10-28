@@ -1,3 +1,3 @@
-if ! (( $+commands[fd] )) && (( $+commands[fdfind] )); then
+if ! (( $+commands[fd] )); then
     alias fd=fdfind
 fi

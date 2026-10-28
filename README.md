@@ -130,9 +130,9 @@ bash bootstrap.sh --list-modules
 | Git 通用配置 | `~/.gitconfig` |
 | Powerlevel10k 个人覆盖配置 | `~/.p10k.zsh` |
 
-基础配置始终部署；可选片段按实际命令和安装文件是否就绪部署，支持接入已有工具。插件清单需已生成插件静态配置，主题覆盖配置需 Powerlevel10k 和 gitstatusd 就绪。单独重跑 `dotfiles` 不会因为本次未选择某个安装模块而删除它的配置。
+基础配置始终部署；可选片段在部署阶段确认命令和安装文件就绪，支持接入已有工具。插件清单需已生成插件静态配置，主题覆盖配置需 Powerlevel10k 和 gitstatusd 就绪。`dotfiles` 不自动删除已有片段；卸载工具后需自行删除用户目录中的对应片段。
 
-基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，安装新工具后重跑 `dotfiles` 接入。修改插件清单后，重跑 `zsh_plugins` 模块生成静态配置。
+基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序，仅加载存在的片段。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，片段只保留可选文件、缓存和实际功能分支的判断。安装新工具后重跑 `dotfiles` 接入；修改插件清单后，重跑 `zsh_plugins` 模块生成静态配置。
 
 Powerlevel10k 先加载固定版本主题自带的 lean 模板，再加载 `~/.p10k.zsh` 并刷新提示符。仓库只维护个人差异，可直接编辑该文件；升级主题时需核对覆盖项。`p10k configure` 会将完整配置写入同一用户文件，主题目录中的模板保持不变。
 
