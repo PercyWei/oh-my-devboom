@@ -4,7 +4,6 @@ module_dotfiles() {
     local pair source destination ready result status=0
     local config_dir="$XDG_CONFIG_HOME/oh-my-devboom/zsh"
     local data_dir="$XDG_DATA_HOME/oh-my-devboom"
-    local legacy_plugins="$XDG_CONFIG_HOME/oh-my-devboom/zsh_plugins.txt"
     local daemon_os=$OS daemon_arch=$ARCH
     if [[ "$OS" == macos ]]; then
         daemon_os=darwin
@@ -26,11 +25,7 @@ module_dotfiles() {
                     source="$ROOT_DIR/config/zsh/zsh_plugins.txt"
                     destination="${ZDOTDIR:-$HOME}/.zsh_plugins.txt"
                     # 清单交由用户维护，backup 也不替换已有内容。
-                    if [[ ! -e "$destination" && ! -L "$destination" ]]; then
-                        if [[ -e "$legacy_plugins" || -L "$legacy_plugins" ]]; then source=$legacy_plugins; fi
-                    else
-                        ready=0
-                    fi
+                    [[ ! -e "$destination" && ! -L "$destination" ]] || ready=0
                 fi
                 ;;
             powerlevel10k-preset|powerlevel10k-instant|powerlevel10k)

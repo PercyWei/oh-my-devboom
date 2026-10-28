@@ -4,8 +4,6 @@ module_antidote() {
     local antidote_dir="$XDG_DATA_HOME/oh-my-devboom/antidote"
     local antidote_commit=9bb69ab99c6f05d6e6ae237f7ce222eeeb5b4a14
     local plugins="${ZDOTDIR:-$HOME}/.zsh_plugins.txt"
-    local legacy_plugins="$XDG_CONFIG_HOME/oh-my-devboom/zsh_plugins.txt"
-    local plugin_source="$ROOT_DIR/config/zsh/zsh_plugins.txt"
     local cache="$XDG_CACHE_HOME/oh-my-devboom"
     local staging result=0 RECORD_PACKAGE_RESULTS=0
 
@@ -18,13 +16,9 @@ module_antidote() {
         fi
         record_result ready Antidote "v2.3.0，固定提交 ${antidote_commit:0:7}；$antidote_dir"
     fi
-    # 新位置优先；缺失时沿用旧清单，旧文件保留。
-    if [[ ! -e "$plugins" && ! -L "$plugins" && ( -e "$legacy_plugins" || -L "$legacy_plugins" ) ]]; then
-        plugin_source=$legacy_plugins
-    fi
     # 清单只初始化一次；已有文件软链接保留当前内容并转为普通文件。
     if [[ ! -e "$plugins" && ! -L "$plugins" ]] || [[ -L "$plugins" && -f "$plugins" ]]; then
-        deploy_config "$plugin_source" "$plugins" || return $?
+        deploy_config "$ROOT_DIR/config/zsh/zsh_plugins.txt" "$plugins" || return $?
         # 不继承仓库旧时间戳，让 Antidote 识别新清单。
         touch "$plugins" || return 1
     fi
