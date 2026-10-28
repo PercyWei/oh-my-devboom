@@ -40,11 +40,13 @@ bash bootstrap.sh --config config/local.conf
 | `clash` | clashctl、Mihomo 和 yq；使用本地 YAML，在安装期间提供代理，仅支持 Linux |
 | `base` | git、curl、wget、vim、unzip、zsh |
 | `homebrew` | 安装或复用 Homebrew，并配置 PATH |
-| `zsh` | Antidote、Oh My Zsh Git 插件、zsh-completions、zsh-autosuggestions、zsh-syntax-highlighting |
+| `zsh_plugins` | Antidote、Oh My Zsh Git 插件、zsh-completions、zsh-autosuggestions、zsh-syntax-highlighting |
 | `powerlevel10k` | Powerlevel10k 主题、gitstatusd 和个人主题预设 |
 | `tools` | 下表中的开发工具 |
 | `dotfiles` | 复制基础 Shell/Git 配置，按已就绪组件部署可选配置片段 |
 | `shell` | 将当前账户的默认登录 Shell 设为 Zsh |
+
+Zsh 本体由 `base` 安装，插件和默认登录 Shell 分别由 `zsh_plugins`、`shell` 控制。
 
 | 开发工具 | 用途 |
 | --- | --- |
@@ -87,6 +89,8 @@ NVTOP 需要 GPU 驱动及设备访问权限，容器需暴露 GPU；macOS 仅�
 
 指定配置文件会完整替代默认配置：未列出的模块和工具关闭；选项默认使用 `allow_remote=false`、`conflict=skip`、`github_proxy=`、`git_timeout=600`。值不加引号，不展开 `~` 或 `$HOME`；命令行参数优先于配置文件。
 
+**旧配置迁移：** 将已有 `config/local.conf` 中 `[modules]` 下的 `zsh` 改为 `zsh_plugins`；命令行使用 `--modules zsh_plugins`。
+
 ### 常用命令
 
 ```bash
@@ -128,7 +132,7 @@ bash bootstrap.sh --list-modules
 
 基础配置始终部署；可选片段按实际命令和安装文件是否就绪部署，支持接入已有工具。插件清单需已生成插件静态配置，主题预设需 Powerlevel10k 和 gitstatusd 就绪。单独重跑 `dotfiles` 不会因为本次未选择某个安装模块而删除它的配置。
 
-基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，安装新工具后重跑 `dotfiles` 接入。修改插件清单后，重跑 `zsh` 模块生成静态配置；主题可直接修改 `.p10k.zsh` 或运行 `p10k configure`。
+基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，安装新工具后重跑 `dotfiles` 接入。修改插件清单后，重跑 `zsh_plugins` 模块生成静态配置；主题可直接修改 `.p10k.zsh` 或运行 `p10k configure`。
 
 Antidote 通过 `use-omz` 加载 Oh My Zsh Git 插件及必要依赖，提供 `gst`（`git status`）、`gp`（`git push`）、`ga`（`git add`）等别名。Zellij 就绪时部署独立片段，使用 `zj` 启动。
 
@@ -154,11 +158,11 @@ bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
 
 ```bash
 bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
-bash bootstrap.sh --non-interactive --modules zsh --allow-remote
+bash bootstrap.sh --non-interactive --modules zsh_plugins --allow-remote
 exec zsh
 ```
 
-需要 Clash 代理时，第二步改用 `--config config/local.conf --modules clash,zsh`。
+需要 Clash 代理时，第二步改用 `--config config/local.conf --modules clash,zsh_plugins`。
 
 个人 Git 身份单独保存在 `~/.gitconfig.local`：
 
@@ -197,7 +201,7 @@ uv 安装 Hub 工具需要访问 PyPI，缺少合适的 Python 时还需访问 G
 
 **安装后仍是 Bash？**
 
-先检查摘要中的 `zsh`、`powerlevel10k` 和 `dotfiles` 是否完成，再运行 `exec zsh`。`shell` 模块修改登录 Shell，重新登录后生效；容器平台若固定启动 `bash`，还需调整平台的终端启动命令。
+先检查摘要中的 `zsh_plugins`、`powerlevel10k` 和 `dotfiles` 是否完成，再运行 `exec zsh`。`shell` 模块修改登录 Shell，重新登录后生效；容器平台若固定启动 `bash`，还需调整平台的终端启动命令。
 
 **可以重复执行吗？如何更新？**
 

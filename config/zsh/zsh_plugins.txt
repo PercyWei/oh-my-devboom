@@ -1,4 +1,4 @@
-# 使用 Antidote 的 pin 锁定提交。修改后重跑 bootstrap.sh --modules zsh。
+# 使用 Antidote 的 pin 锁定提交。修改后重跑 bootstrap.sh --modules zsh_plugins。
 # use-omz 按需加载 Oh My Zsh 依赖；Git 补全先入队，再由 compinit 初始化。
 getantidote/use-omz pin:317648f75d2643abcd7cf580062a8999b11473d7
 ohmyzsh/ohmyzsh path:plugins/git pin:d2b7f557cceaddb16ba89bbf8200d8a8df35c4d8

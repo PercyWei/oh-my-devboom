@@ -15,7 +15,7 @@ Usage: ./bootstrap.sh [options]
 Set up a personal development environment on Linux or macOS (Bash 3.2+).
 
   --config FILE     Installation settings (default: config/default.conf)
-  --modules LIST    Override modules: clash,base,homebrew,zsh,powerlevel10k,tools,dotfiles,shell
+  --modules LIST    Override modules: clash,base,homebrew,zsh_plugins,powerlevel10k,tools,dotfiles,shell
                     Comma-separated names, or all.
   --tools LIST      Override tools: uv,fzf,rg,bat,eza,zoxide,zellij,nvtop,jq,fd,gh,
                     modelscope-hub,huggingface-hub (automatically include uv).
@@ -48,7 +48,7 @@ list_modules() {
 clash      Enable Clash from a local YAML file; stop it when done (Linux only)
 base       Install git, curl, wget, vim, unzip and zsh
 homebrew   Install Homebrew when its host requirements are met
-zsh        Zsh Augmented: Antidote, Git aliases, completions, suggestions and highlighting
+zsh_plugins Zsh plugins: Antidote, Git aliases, completions, suggestions and highlighting
 powerlevel10k Install the Powerlevel10k Zsh prompt
 tools      Install selected optional developer tools
 dotfiles   Copy base configuration and settings for available components
@@ -74,7 +74,7 @@ parse_args() {
                         if [[ "$1" == --modules ]]; then choices=$AVAILABLE_MODULES; else choices=$AVAILABLE_TOOLS; fi
                         [[ "$values" != all ]] || values=${choices// /,}
                         case "$values" in
-                            ,*|*,|*,,*|*[!a-z0-9,-]*) log_error "Invalid list: $values"; return 1 ;;
+                            ,*|*,|*,,*|*[!a-z0-9_,-]*) log_error "Invalid list: $values"; return 1 ;;
                         esac
                         local selected=''
                         for item in ${values//,/ }; do
@@ -129,7 +129,7 @@ print_install_plan() {
             clash) printf '  clash: clashctl、Mihomo、yq（Linux；配置：%s）\n' "${CLASH_CONFIG_FILE:-未填写 [clash] config_file}" ;;
             base) printf '  base: git、curl、wget、vim、unzip、zsh\n' ;;
             homebrew) printf '  homebrew: Homebrew（不满足安装条件时跳过）\n' ;;
-            zsh) printf '  zsh: Zsh Augmented · Antidote、Git 别名、补全、自动建议、语法高亮\n' ;;
+            zsh_plugins) printf '  zsh_plugins: Zsh 插件 · Antidote、Git 别名、补全、自动建议、语法高亮\n' ;;
             powerlevel10k) printf '  powerlevel10k: Powerlevel10k、gitstatusd\n' ;;
             tools) printf '  tools: %s\n' "${TOOLS:-未选择工具}" ;;
             dotfiles) printf '  dotfiles: 基础配置及已就绪组件的配置片段\n' ;;
@@ -320,8 +320,8 @@ main() {
     case ":$PATH:" in *":$HOME/.local/bin:"*) ;; *) export PATH="$HOME/.local/bin:$PATH" ;; esac
     detect_system || return 1
     local module answer result failed=0 total=0 started module_started first item successful pending errors state elapsed
-    local execution_order='clash base homebrew zsh powerlevel10k tools dotfiles shell'
-    if [ "$OS" = macos ]; then execution_order='clash homebrew base zsh powerlevel10k tools dotfiles shell'; fi
+    local execution_order='clash base homebrew zsh_plugins powerlevel10k tools dotfiles shell'
+    if [ "$OS" = macos ]; then execution_order='clash homebrew base zsh_plugins powerlevel10k tools dotfiles shell'; fi
     printf '\n'
     print_styled '1;36' 'oh-my-devboom'
     printf '\n开发环境初始化\n\n环境    %s / %s / %s · uid=%s · 包管理器=%s · 容器=%s\n' \

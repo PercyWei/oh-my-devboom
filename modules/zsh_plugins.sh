@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-module_zsh() {
+module_zsh_plugins() {
     local antidote_dir="$XDG_DATA_HOME/oh-my-devboom/antidote"
     local antidote_commit=9bb69ab99c6f05d6e6ae237f7ce222eeeb5b4a14
     local plugins="$XDG_CONFIG_HOME/oh-my-devboom/zsh_plugins.txt"
@@ -12,7 +12,7 @@ module_zsh() {
     if [[ -e "$antidote_dir" || -L "$antidote_dir" ]]; then
         if [[ ! -f "$antidote_dir/antidote.zsh" ]] ||
             [[ "$(git -C "$antidote_dir" rev-parse HEAD 2>/dev/null)" != "$antidote_commit" ]]; then
-            record_result skipped Antidote "现有目录与固定版本 v2.3.0 不符，已保留：$antidote_dir" '检查并自行整理现有目录后，重试 zsh 模块。'
+            record_result skipped Antidote "现有目录与固定版本 v2.3.0 不符，已保留：$antidote_dir" '检查并自行整理现有目录后，重试 zsh_plugins 模块。'
             return 2
         fi
         record_result ready Antidote "v2.3.0，固定提交 ${antidote_commit:0:7}；$antidote_dir"
@@ -24,7 +24,7 @@ module_zsh() {
     approve_remote "Antidote v2.3.0 与 Zsh 插件" \
         "https://github.com/mattmc3/antidote/tree/${antidote_commit}；插件源及固定提交见 $plugins" || return $?
     mkdir -p "$XDG_DATA_HOME/oh-my-devboom" "$cache" || {
-        record_result failed 'Zsh Augmented' "无法创建安装或缓存目录：$XDG_DATA_HOME/oh-my-devboom、$cache" '检查目录权限和可用磁盘空间。'
+        record_result failed 'Zsh 插件' "无法创建安装或缓存目录：$XDG_DATA_HOME/oh-my-devboom、$cache" '检查目录权限和可用磁盘空间。'
         return 1
     }
     if [[ ! -d "$antidote_dir" ]]; then

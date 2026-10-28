@@ -99,13 +99,13 @@ RELEASE
         output=$("$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --help)
         [[ "$output" == *--config* && "$output" == *--modules* && "$output" == *--allow-remote* ]] || fail 'Help documents config, module and remote options'
         output=$("$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --list-modules)
-        for module in clash base homebrew zsh powerlevel10k tools dotfiles shell; do
+        for module in clash base homebrew zsh_plugins powerlevel10k tools dotfiles shell; do
             [[ "$output" == *"$module"* ]] || fail "Missing module in list: $module"
         done
         [[ "$output" != *starship* ]] || fail 'Removed Starship module is still listed'
         source "$REPO_ROOT/bootstrap.sh"
         parse_args --non-interactive
-        assert_equal 'clash base homebrew zsh powerlevel10k tools dotfiles shell' "$MODULES" 'Default config enables Clash first and login shell setup last'
+        assert_equal 'clash base homebrew zsh_plugins powerlevel10k tools dotfiles shell' "$MODULES" 'Default config enables Clash first and login shell setup last'
         assert_equal 'uv fzf rg bat eza zoxide nvtop jq fd gh zellij modelscope-hub huggingface-hub' "$TOOLS" 'Default tools install uv before its dependent tools'
         assert_equal 'https://ghfast.top/' "$GITHUB_PROXY" 'Default config selects the GitHub download prefix'
         assert_equal 600 "$GIT_TIMEOUT" 'Default Git download timeout is ten minutes'

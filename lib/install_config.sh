@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-AVAILABLE_MODULES='clash base homebrew zsh powerlevel10k tools dotfiles shell'
+AVAILABLE_MODULES='clash base homebrew zsh_plugins powerlevel10k tools dotfiles shell'
 AVAILABLE_TOOLS='uv fzf rg bat eza zoxide zellij nvtop jq fd gh modelscope-hub huggingface-hub'
 
 load_install_config() {
