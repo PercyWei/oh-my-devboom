@@ -15,10 +15,22 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+      - name: Install check tools (Linux)
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y zsh shellcheck
+      - name: Install check tools (macOS)
+        if: runner.os == 'macOS'
+        run: brew install zsh shellcheck
+      - name: Show check tool versions
+        run: |
+          /bin/bash --version
+          zsh --version
+          shellcheck --version
       - name: Check Bash syntax
         run: git ls-files -z '*.sh' | xargs -0 -n 1 /bin/bash -n
+      - name: Check Bash with ShellCheck
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck --severity=warning
       - name: Check Zsh syntax
-        if: runner.os == 'macOS'
-        run: /bin/zsh -n config/zsh/zshrc && /bin/zsh -n config/powerlevel10k/p10k.zsh
+        run: git ls-files -z '*.zsh' 'config/zsh/zshrc' | xargs -0 -n 1 zsh -n
       - name: Run isolated tests
         run: /bin/bash tests/run.sh

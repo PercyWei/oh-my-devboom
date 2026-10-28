@@ -29,8 +29,17 @@ run_privileged() {
     return 0
 }
 
+resolve_package_command() {
+    local cmd=$1
+    if have "$cmd"; then command -v "$cmd"
+    elif [ "$cmd" = bat ] && have batcat; then command -v batcat
+    elif [ "$cmd" = fd ] && have fdfind; then command -v fdfind
+    else return 1
+    fi
+}
+
 ensure_packages() {
-    local cmd package executable missing=() commands=() result=0 index
+    local cmd package executable missing=() commands=() result=0 status=0 index
     local phase='安装软件包' reason='' action=''
     for cmd in "$@"; do
         case "$cmd" in
@@ -56,14 +65,9 @@ ensure_packages() {
                 ;;
             *) package=$cmd ;;
         esac
-        executable=''
-        if have "$cmd"; then executable=$cmd
-        elif [ "$cmd" = bat ] && have batcat; then executable=batcat
-        elif [ "$cmd" = fd ] && have fdfind; then executable=fdfind
-        fi
-        if [ -n "$executable" ]; then
+        if executable=$(resolve_package_command "$cmd"); then
             if [ "${RECORD_PACKAGE_RESULTS:-1}" -eq 1 ]; then
-                record_result ready "$cmd" "检测到 $executable 命令，复用当前安装。"
+                record_result ready "$cmd" "复用现有命令：$executable"
             fi
             continue
         fi
@@ -112,18 +116,25 @@ ensure_packages() {
             action='请查看上方包管理器错误，处理权限、软件源或网络问题后重试本模块。'
         fi
     fi
+    status=$result
     for ((index=0; index<${#missing[@]}; index++)); do
         cmd=${commands[$index]}
         package=${missing[$index]}
         case "$result" in
             0)
-                if [ "${RECORD_PACKAGE_RESULTS:-1}" -eq 1 ]; then
-                    record_result installed "$cmd" "$PACKAGE_MANAGER 已完成软件包 $package 的安装。"
+                if executable=$(resolve_package_command "$cmd"); then
+                    if [ "${RECORD_PACKAGE_RESULTS:-1}" -eq 1 ]; then
+                        record_result installed "$cmd" "$PACKAGE_MANAGER 软件包 ${package}；命令：$executable"
+                    fi
+                else
+                    record_result failed "$cmd" "$PACKAGE_MANAGER 返回成功，但 PATH 中未找到软件包 $package 对应的命令。" \
+                        '检查软件包内容、命令名称和 PATH 后重试本模块。'
+                    status=1
                 fi
                 ;;
             2) record_result skipped "$cmd" "${reason}所需软件包：${package}。" "$action" ;;
             *) record_result failed "$cmd" "${reason}软件包：${package}。" "$action" ;;
         esac
     done
-    return "$result"
+    return "$status"
 }

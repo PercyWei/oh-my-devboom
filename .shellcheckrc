@@ -1,0 +1,4 @@
+# Sourced modules exchange shared variables that may be consumed in another file.
+disable=SC2034
+external-sources=true
+source-path=SCRIPTDIR

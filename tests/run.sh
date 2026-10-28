@@ -303,7 +303,24 @@ RELEASE
         source "$REPO_ROOT/lib/packages.sh"
         available='git curl batcat fdfind'
         have() { [[ " $available " == *" $1 "* ]]; }
-        apt-get() { printf '%s\n' "apt-get $*" >> "$TEST_ROOT/packages.log"; }
+        for fixture_command in git curl batcat fdfind rg eza zellij nvtop jq; do
+            printf '#!/bin/sh\nexit 99\n' > "$TEST_ROOT/bin/$fixture_command"
+            chmod +x "$TEST_ROOT/bin/$fixture_command"
+        done
+        apt-get() {
+            local fixture_package fixture_command
+            printf '%s\n' "apt-get $*" >> "$TEST_ROOT/packages.log"
+            if [[ "$1" == install ]]; then
+                for fixture_package in "${@:3}"; do
+                    case "$fixture_package" in
+                        ripgrep) fixture_command=rg ;;
+                        fd-find) fixture_command=fdfind ;;
+                        *) fixture_command=$fixture_package ;;
+                    esac
+                    available="$available $fixture_command"
+                done
+            fi
+        }
         PACKAGE_MANAGER=apt-get
         PACKAGES_REFRESHED=0
         USER_ID=0
@@ -313,13 +330,9 @@ RELEASE
         [[ ! -e "$TEST_ROOT/packages.log" ]] || fail 'Present commands invoked a package manager'
         available='git curl batcat'
         ensure_packages git curl bat rg
-        available="$available rg"
         ensure_packages eza
-        available="$available eza"
         ensure_packages zellij nvtop
-        available="$available zellij nvtop"
         ensure_packages jq fd
-        available="$available jq fdfind"
         ensure_packages git curl bat rg eza zellij nvtop jq fd
         expected=$(printf 'apt-get update\napt-get install -y ripgrep\napt-get install -y eza\napt-get install -y zellij nvtop\napt-get install -y jq fd-find')
         assert_equal "$expected" "$(cat "$TEST_ROOT/packages.log")" 'Only missing packages install; apt refreshes once'
@@ -331,15 +344,21 @@ RELEASE
 
         USER_ID=0
         available=fdfind
-        dnf() { printf '%s\n' "dnf $*" >> "$TEST_ROOT/packages.log"; }
-        yum() { printf '%s\n' "yum $*" >> "$TEST_ROOT/packages.log"; }
+        dnf() {
+            printf '%s\n' "dnf $*" >> "$TEST_ROOT/packages.log"
+            available='jq fdfind'
+        }
+        yum() {
+            printf '%s\n' "yum $*" >> "$TEST_ROOT/packages.log"
+            available='jq fdfind'
+        }
         for package_manager in dnf yum; do
             PACKAGE_MANAGER=$package_manager
             ensure_packages fd
         done
         assert_equal "$expected" "$(cat "$TEST_ROOT/packages.log")" 'RPM managers skip an available fdfind command'
-        available=''
         for package_manager in dnf yum; do
+            available=''
             PACKAGE_MANAGER=$package_manager
             ensure_packages jq fd
         done

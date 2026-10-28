@@ -95,7 +95,7 @@ module_clash() {
     CLASH_CLEANUP_HOME=$clash_dir
     if [[ "$complete" == 0 ]]; then
         staging=$(mktemp -d "$cache/clashctl.XXXXXX") || return 1
-        [[ "$IN_CONTAINER" != 1 ]] || service=nohup
+        [[ "$IN_CONTAINER" != 1 ]] || service='nohup'
         if ! (
             trap 'rm -rf -- "$staging"' EXIT
             download_file "$source_url" "$staging/source.tar.gz" || exit 1

@@ -68,6 +68,8 @@ Zsh 本体由 `base` 安装，`antidote` 准备插件管理器和清单，`shell
 
 Linux 使用 `apt-get`、`dnf`、`yum`、`pacman`、`zypper` 或 `apk`，macOS 使用 Homebrew。root 跳过 Homebrew；Linux 容器不新装 Homebrew。系统包安装需要 root 或 sudo，权限不足或包不可用时会提示。
 
+系统包安装后逐项确认对应命令可用，摘要显示实际命令路径；未找到命令时报告失败。直接下载的 Zellij 在部署前执行 `--version`，确认二进制可以运行。
+
 安装和 Zsh 初始化都优先使用 PATH 中的 `brew`，未找到时再搜索标准安装目录。
 
 NVTOP 需要 GPU 驱动及设备访问权限，容器需暴露 GPU；macOS 仅支持 Apple GPU。Debian/Ubuntu 的 `batcat`、`fdfind` 会按需配置为 `bat`、`fd` 别名。
@@ -126,11 +128,12 @@ Hub 示例要求已安装 Zsh；全新环境可将模块列表改为 `base,tools
 
 ## 配置管理
 
-配置复制到用户目录，安装后不依赖仓库位置，可直接编辑目标文件。`XDG_CONFIG_HOME`、`XDG_DATA_HOME`、`XDG_CACHE_HOME` 默认分别是 `~/.config`、`~/.local/share`、`~/.cache`；设置 `ZDOTDIR` 时，`.zshrc`、`.p10k.zsh` 和 `.zsh_plugins.txt` 跟随该目录。
+配置复制到用户目录，安装后不依赖仓库位置，可直接编辑目标文件。`XDG_CONFIG_HOME`、`XDG_DATA_HOME`、`XDG_CACHE_HOME` 默认分别是 `~/.config`、`~/.local/share`、`~/.cache`；设置 `ZDOTDIR` 时，`.zshrc`、`.zshrc.local`、`.p10k.zsh` 和 `.zsh_plugins.txt` 跟随该目录。
 
 | 配置 | 默认目标 |
 | --- | --- |
 | 基础 Zsh 配置 | `~/.zshrc` |
+| 个人 Zsh 覆盖配置 | `~/.zshrc.local`（用户维护） |
 | 可选 Zsh 片段 | `~/.config/oh-my-devboom/zsh/` |
 | Antidote 插件清单 | `~/.zsh_plugins.txt` |
 | Git 通用配置 | `~/.gitconfig` |
@@ -141,6 +144,8 @@ Hub 示例要求已安装 Zsh；全新环境可将模块列表改为 `base,tools
 基础配置始终部署；可选片段在部署阶段确认命令和安装文件就绪，支持接入已有工具。插件配置需 Antidote 就绪，主题覆盖配置需 Powerlevel10k 和 gitstatusd 就绪。`dotfiles` 不自动删除已有片段；卸载工具后需自行删除用户目录中的对应片段。
 
 基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序，仅加载存在的片段。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，片段只保留可选文件、缓存和实际功能分支的判断。安装新工具后重跑 `dotfiles` 接入。
+
+个人 alias 和环境变量可写入 `${ZDOTDIR:-$HOME}/.zshrc.local`，在全部工具与主题配置之后加载。该文件由用户自行创建和维护，bootstrap 不部署或覆盖。需要影响工具初始化的参数应在工具加载前设置，例如通过 `.zshenv` 设置路径变量；Powerlevel10k 的个人设置继续写入 `.p10k.zsh`。
 
 Powerlevel10k 先加载固定版本主题自带的 lean 模板，再加载 `~/.p10k.zsh`，个人覆盖在首次提示符显示前生效。仓库只维护个人差异，可直接编辑该文件；升级主题时需核对覆盖项。`p10k configure` 会将完整配置写入同一用户文件，主题目录中的模板保持不变。
 
@@ -294,11 +299,13 @@ scripts/         # 镜像与固定版本维护
 tests/run.sh     # 基础检查
 ```
 
-基础检查使用临时 HOME 和模拟的包管理、下载命令，CI 配置覆盖 Ubuntu 与 macOS：
+基础检查使用临时 HOME 和模拟的包管理、下载命令：
 
 ```bash
 bash tests/run.sh
 ```
+
+CI 在 Ubuntu 与 macOS 上准备 Zsh、ShellCheck 并输出实际版本。Bash 语法检查和现有检查套件使用 `/bin/bash`，保留 macOS 的 Bash 3.2 验证；所有 Zsh 配置和片段使用 `zsh -n` 检查，Bash 脚本使用 ShellCheck 静态分析。
 
 Clash 的完整安装流程、终端交互和 GPU 展示仍需在目标环境实机验证。
 

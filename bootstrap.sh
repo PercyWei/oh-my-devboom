@@ -344,6 +344,7 @@ main() {
     started=$SECONDS
     for module in $execution_order; do
         case " $MODULES " in *" $module "*) ;; *) continue ;; esac
+        # shellcheck source=/dev/null
         source "$ROOT_DIR/modules/$module.sh"
         CURRENT_MODULE=$module
         first=$RESULT_COUNT

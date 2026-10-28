@@ -58,3 +58,7 @@ if [[ -r "$_devboom_zsh_dir/powerlevel10k.zsh" ]]; then
     source "$_devboom_zsh_dir/powerlevel10k.zsh"
 fi
 unset _devboom_zsh_dir _devboom_module
+
+if [[ -r "${ZDOTDIR:-$HOME}/.zshrc.local" ]]; then
+    source "${ZDOTDIR:-$HOME}/.zshrc.local"
+fi

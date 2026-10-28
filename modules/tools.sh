@@ -78,6 +78,12 @@ install_zellij() {
         rm -rf -- "$staging"
         return 1
     fi
+    if ! "$staging/zellij" --version >/dev/null; then
+        record_result failed Zellij '下载的二进制无法运行，尚未安装。' \
+            '检查上方执行错误、当前平台及系统运行环境后重试。'
+        rm -rf -- "$staging"
+        return 1
+    fi
     if ! mv -- "$staging/zellij" "$HOME/.local/bin/zellij"; then
         record_result failed Zellij "无法将二进制文件安装到 $HOME/.local/bin/zellij。" \
             '检查安装目录权限及磁盘空间后重试。'

@@ -30,7 +30,11 @@ detect_system() {
     esac
     DISTRO=$OS
     if [ "$OS" = linux ] && [ -r "${OS_RELEASE_FILE:-/etc/os-release}" ]; then
-        DISTRO=$(. "${OS_RELEASE_FILE:-/etc/os-release}"; printf '%s' "${ID:-linux}")
+        DISTRO=$(
+            # shellcheck source=/dev/null
+            . "${OS_RELEASE_FILE:-/etc/os-release}"
+            printf '%s' "${ID:-linux}"
+        )
     fi
     USER_ID=$(id -u)
     HAS_SUDO=0
