@@ -293,10 +293,9 @@ RELEASE
         "$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --modules dotfiles --non-interactive --conflict backup > "$TEST_ROOT/backup-run.log" 2>&1 || { cat "$TEST_ROOT/backup-run.log" >&2; fail 'Dotfiles backup run failed'; }
         "$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --modules dotfiles --non-interactive --conflict backup > "$TEST_ROOT/repeated-backup-run.log" 2>&1 || { cat "$TEST_ROOT/repeated-backup-run.log" >&2; fail 'Repeated dotfiles backup run failed'; }
         [[ -f "$ZDOTDIR/.p10k.zsh" && ! -L "$ZDOTDIR/.p10k.zsh" ]] || fail 'Dotfiles module did not respect ZDOTDIR for .p10k.zsh'
-        cmp -s "$REPO_ROOT/config/powerlevel10k/p10k.zsh" "$ZDOTDIR/.p10k.zsh" || fail 'ZDOTDIR Powerlevel10k preset differs from source'
+        assert_equal 'personal prompt' "$(cat "$ZDOTDIR/.p10k.zsh")" 'Backup policy preserves the user-maintained Powerlevel10k preset'
         backups=("$ZDOTDIR/.p10k.zsh.backup."*)
-        assert_equal 1 "${#backups[@]}" 'Repeated Powerlevel10k deployment creates one backup'
-        assert_equal 'personal prompt' "$(cat "${backups[0]}")" 'Powerlevel10k backup preserves contents'
+        assert_equal 0 "${#backups[@]}" 'User-maintained Powerlevel10k preset needs no backup'
         ;;
     packages)
         source "$REPO_ROOT/lib/common.sh"

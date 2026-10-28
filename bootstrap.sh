@@ -20,6 +20,9 @@ Set up a personal development environment on Linux or macOS (Bash 3.2+).
   --tools LIST      Override tools: uv,fzf,rg,bat,eza,zoxide,zellij,nvtop,jq,fd,gh,
                     modelscope-hub,huggingface-hub (automatically include uv).
                     Comma-separated names, or all. Requires the tools module.
+  --dotfiles LIST   Select configuration components: zshrc,git,homebrew,clash,eza,
+                    bat,fd,zellij,huggingface-hub,fzf,zoxide,antidote,powerlevel10k.
+                    Comma-separated names, or all (default). Requires dotfiles.
   --non-interactive Run without prompts; required when stdin is not a terminal
   --allow-remote    Authorize direct upstream downloads and execution:
                     clashctl and its Mihomo/yq components;
@@ -37,6 +40,7 @@ Examples:
   ./bootstrap.sh --non-interactive --modules dotfiles
   ./bootstrap.sh --config config/local.conf --non-interactive --allow-remote --modules all --tools all
   ./bootstrap.sh --non-interactive --modules dotfiles --conflict backup
+  ./bootstrap.sh --non-interactive --modules dotfiles --dotfiles homebrew,huggingface-hub --conflict backup
 
 Command-line options override the selected config regardless of argument order.
 Interactive runs show the installation plan and ask for confirmation.
@@ -57,21 +61,25 @@ EOF
 }
 
 parse_args() {
-    local modules_override='' tools_override='' conflict_override='' remote_override=0
+    local modules_override='' tools_override='' dotfiles_override='' conflict_override='' remote_override=0
     CONFIG_FILE="$ROOT_DIR/config/default.conf"
     INTERACTIVE=1
     ACTION=install
     while [ "$#" -gt 0 ]; do
         case "$1" in
-            --config|--modules|--tools|--conflict)
+            --config|--modules|--tools|--dotfiles|--conflict)
                 if [ "$#" -lt 2 ] || [ -z "$2" ] || [[ $2 == --* ]]; then
                     log_error "$1 requires a value"; return 1
                 fi
                 case "$1" in
                     --config) CONFIG_FILE=$2 ;;
-                    --modules|--tools)
+                    --modules|--tools|--dotfiles)
                         local item values=$2 choices
-                        if [[ "$1" == --modules ]]; then choices=$AVAILABLE_MODULES; else choices=$AVAILABLE_TOOLS; fi
+                        case "$1" in
+                            --modules) choices=$AVAILABLE_MODULES ;;
+                            --tools) choices=$AVAILABLE_TOOLS ;;
+                            --dotfiles) choices=$AVAILABLE_DOTFILES ;;
+                        esac
                         [[ "$values" != all ]] || values=${choices// /,}
                         case "$values" in
                             ,*|*,|*,,*|*[!a-z0-9_,-]*) log_error "Invalid list: $values"; return 1 ;;
@@ -84,7 +92,11 @@ parse_args() {
                             esac
                             case " $selected " in *" $item "*) ;; *) selected="${selected:+$selected }$item" ;; esac
                         done
-                        if [ "$1" = --modules ]; then modules_override=$selected; else tools_override=$selected; fi
+                        case "$1" in
+                            --modules) modules_override=$selected ;;
+                            --tools) tools_override=$selected ;;
+                            --dotfiles) dotfiles_override=$selected ;;
+                        esac
                         ;;
                     --conflict)
                         case "$2" in skip|backup) conflict_override=$2 ;; *) log_error "Unknown conflict policy: $2"; return 1 ;; esac
@@ -103,6 +115,12 @@ parse_args() {
     load_install_config "$CONFIG_FILE" || return 1
     [[ -z "$modules_override" ]] || MODULES=$modules_override
     [[ -z "$tools_override" ]] || TOOLS=$tools_override
+    if [[ -n "$dotfiles_override" ]]; then
+        case " $MODULES " in
+            *' dotfiles '*) DOTFILES=$dotfiles_override ;;
+            *) log_error '--dotfiles requires the dotfiles module'; return 1 ;;
+        esac
+    fi
     [[ -z "$conflict_override" ]] || CONFLICT_POLICY=$conflict_override
     [[ "$remote_override" == 0 ]] || ALLOW_REMOTE=1
     case " $TOOLS " in
@@ -132,7 +150,7 @@ print_install_plan() {
             antidote) printf '  antidote: Antidote 与插件清单（按清单准备插件）\n' ;;
             powerlevel10k) printf '  powerlevel10k: Powerlevel10k、gitstatusd\n' ;;
             tools) printf '  tools: %s\n' "${TOOLS:-未选择工具}" ;;
-            dotfiles) printf '  dotfiles: 基础配置及已就绪组件的配置片段\n' ;;
+            dotfiles) printf '  dotfiles: %s（按组件就绪情况部署）\n' "$DOTFILES" ;;
             shell) printf '  shell: 将当前执行账户的默认登录 Shell 设为 Zsh（chsh）\n' ;;
         esac
     done
@@ -289,6 +307,9 @@ print_install_summary() {
             "$ROOT_DIR/bootstrap.sh" "$config_path" "$retry_modules"
         case ",$retry_modules," in
             *,tools,*) [[ -z "$TOOLS" ]] || printf ' --tools %q' "${TOOLS// /,}" ;;
+        esac
+        case ",$retry_modules," in
+            *,dotfiles,*) printf ' --dotfiles %q' "${DOTFILES// /,}" ;;
         esac
         printf ' --conflict %q' "$CONFLICT_POLICY"
         [[ "$ALLOW_REMOTE" != 1 ]] || printf ' --allow-remote'

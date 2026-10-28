@@ -9,6 +9,7 @@ install_zellij() {
         ensure_packages zellij
         return $?
     fi
+    local version=v0.45.1
     local target sha256 url staging checksum result=0 RECORD_PACKAGE_RESULTS=0
     case "$OS:$ARCH" in
         linux:x86_64)
@@ -30,8 +31,8 @@ install_zellij() {
             '检查现有文件及其执行权限，处理后重新运行 tools 模块。'
         return 2
     fi
-    url="https://github.com/zellij-org/zellij/releases/download/v0.45.1/zellij-$target.tar.gz"
-    approve_remote 'Zellij v0.45.1' "$url" || return $?
+    url="https://github.com/zellij-org/zellij/releases/download/$version/zellij-$target.tar.gz"
+    approve_remote "Zellij $version" "$url" || return $?
     ensure_packages tar || return $?
     if ! have sha256sum && ! have shasum; then
         record_result skipped Zellij '缺少 SHA256 校验工具，发布包未安装。' \
@@ -91,7 +92,7 @@ install_zellij() {
         return 1
     fi
     rm -rf -- "$staging"
-    record_result installed Zellij "v0.45.1 已校验并安装到 $HOME/.local/bin/zellij。"
+    record_result installed Zellij "$version 已校验并安装到 $HOME/.local/bin/zellij。"
 }
 
 prepare_fzf_shell_integration() {

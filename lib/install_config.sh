@@ -2,11 +2,13 @@
 
 AVAILABLE_MODULES='clash base homebrew antidote powerlevel10k tools dotfiles shell'
 AVAILABLE_TOOLS='uv fzf rg bat eza zoxide zellij nvtop jq fd gh modelscope-hub huggingface-hub'
+AVAILABLE_DOTFILES='zshrc git homebrew clash eza bat fd zellij huggingface-hub fzf zoxide antidote powerlevel10k'
 
 load_install_config() {
     local file=$1 line section='' key value line_number=0 seen=' '
     MODULES=''
     TOOLS=''
+    DOTFILES=$AVAILABLE_DOTFILES
     ALLOW_REMOTE=0
     CONFLICT_POLICY=skip
     GITHUB_PROXY=''

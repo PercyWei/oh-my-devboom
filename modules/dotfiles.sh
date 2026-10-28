@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 module_dotfiles() {
-    local pair source destination ready result status=0
+    local pair component source destination ready result status=0
     local config_dir="$XDG_CONFIG_HOME/oh-my-devboom/zsh"
     local data_dir="$XDG_DATA_HOME/oh-my-devboom"
     local daemon_os=$OS daemon_arch=$ARCH
@@ -10,6 +10,12 @@ module_dotfiles() {
         [[ "$ARCH" != aarch64 ]] || daemon_arch=arm64
     fi
     for pair in zshrc git plugin-list powerlevel10k-preset homebrew clash eza bat fd zellij huggingface-hub fzf zoxide antidote powerlevel10k-instant powerlevel10k; do
+        case "$pair" in
+            plugin-list) component=antidote ;;
+            powerlevel10k-preset|powerlevel10k-instant) component=powerlevel10k ;;
+            *) component=$pair ;;
+        esac
+        case " $DOTFILES " in *" $component "*) ;; *) continue ;; esac
         source="$ROOT_DIR/config/zsh/modules/$pair.zsh"
         destination="$config_dir/$pair.zsh"
         ready=0
@@ -35,6 +41,10 @@ module_dotfiles() {
                 if [[ -r "$data_dir/powerlevel10k/powerlevel10k.zsh-theme" &&
                       -r "$data_dir/powerlevel10k/config/p10k-lean.zsh" &&
                       -x "$data_dir/gitstatus/gitstatusd-$daemon_os-$daemon_arch" ]]; then ready=1; fi
+                if [[ "$pair" == powerlevel10k-preset ]]; then
+                    # 个人覆盖文件只初始化一次，backup 也保留已有内容。
+                    [[ ! -e "$destination" && ! -L "$destination" ]] || ready=0
+                fi
                 ;;
             homebrew)
                 if [[ "$USER_ID" != 0 ]] && have brew; then ready=1; fi ;;

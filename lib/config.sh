@@ -15,7 +15,7 @@ deploy_config() {
         return 0
     elif { [ -e "$destination" ] || [ -L "$destination" ]; } && [ "$CONFLICT_POLICY" = skip ]; then
         record_result skipped "$destination" '目标已存在，本次保留原配置。' \
-            '如需备份后部署，请使用 --modules dotfiles --conflict backup 重跑安装入口。'
+            '如需备份后部署，请使用摘要中的重试命令，并将 --conflict 改为 backup。'
         return 2
     fi
     if ! mkdir -p "$(dirname "$destination")"; then

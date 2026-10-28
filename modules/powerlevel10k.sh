@@ -3,6 +3,7 @@
 module_powerlevel10k() {
     local theme_dir="$XDG_DATA_HOME/oh-my-devboom/powerlevel10k"
     local theme_commit=d05a1b00f9a61f9578bf9dc19b8451942dde8734
+    local gitstatus_version=v1.5.4
     local daemon_dir="$XDG_DATA_HOME/oh-my-devboom/gitstatus"
     local platform sha256 daemon daemon_url staging checksum result=0 RECORD_PACKAGE_RESULTS=0
 
@@ -43,7 +44,7 @@ module_powerlevel10k() {
             ;;
     esac
     daemon=gitstatusd-$platform
-    daemon_url="https://github.com/romkatv/gitstatus/releases/download/v1.5.4/$daemon.tar.gz"
+    daemon_url="https://github.com/romkatv/gitstatus/releases/download/$gitstatus_version/$daemon.tar.gz"
     if [[ -d "$theme_dir" && -x "$daemon_dir/$daemon" ]]; then
         record_result ready gitstatusd "程序已就绪：$daemon_dir/$daemon"
         return 0
@@ -119,7 +120,7 @@ module_powerlevel10k() {
             return 1
         fi
         rm -rf -- "$staging"
-        record_result installed gitstatusd "v1.5.4，SHA-256 校验通过；$daemon_dir/$daemon"
+        record_result installed gitstatusd "$gitstatus_version，SHA-256 校验通过；$daemon_dir/$daemon"
     else
         record_result ready gitstatusd "程序已就绪：$daemon_dir/$daemon"
     fi

@@ -1,12 +1,16 @@
 # oh-my-devboom
 
-轻量、模块化的个人开发环境初始准备器，适用于 Linux 服务器、Docker 容器和 macOS。
+面向 Linux 服务器、Docker 容器和 macOS 的个人开发环境初始化工具。
 
-使用 Bash 编写，无需预装 Python 或 Node.js。支持按需安装、重复执行和配置备份，已有工具按规则复用，配置以普通文件部署。
+使用 Bash 编写，无需预装 Python 或 Node.js。支持按需安装、重复执行和配置备份；配置以普通文件部署，安装后可独立于源码仓库使用。
+
+[快速开始](#快速开始) · [安装内容](#安装内容) · [按需安装](#按需安装) · [配置与更新](#配置与更新) · [网络与代理](#网络与代理) · [常见问题](#常见问题) · [项目维护](#项目维护)
 
 ## 快速开始
 
-需要 Bash 3.2+ 和 Git。macOS 请先运行 `xcode-select --install`，完成 Command Line Tools 安装后再继续。
+需要 **Bash 3.2+ 和 Git**。macOS 请先运行 `xcode-select --install`，完成 Command Line Tools 安装。
+
+**1. 获取仓库，准备个人安装配置。**
 
 ```bash
 git clone https://github.com/PercyWei/oh-my-devboom.git
@@ -14,144 +18,196 @@ cd oh-my-devboom
 cp config/default.conf config/local.conf
 ```
 
-编辑 `config/local.conf`，选择需要的模块和工具。**Linux 默认启用 Clash**，首次运行前需在已有 `[clash]` 章节填写服务器本地 YAML 的绝对路径：
+编辑 `config/local.conf`，选择需要的模块和工具。该文件已被 Git 忽略。
+
+> **Linux 默认启用 Clash。** 在已有 `[clash]` 章节填写本地 YAML 的绝对路径；代理未就绪时，后续安装会停止。不需要安装期间代理时，将 `[modules]` 中的 `clash` 改为 `false`。macOS 自动跳过该模块。
 
 ```ini
 [clash]
 config_file = /root/clash.yaml
 ```
 
-不需要代理时，将 `[modules]` 中的 `clash` 改为 `false`；macOS 会自动跳过该模块。
+**2. 运行安装，查看结果摘要。**
 
 ```bash
 bash bootstrap.sh --config config/local.conf
 ```
 
-入口会检测环境、展示安装清单并请求确认，结束后汇总完成、跳过和失败项。请以实际使用环境的账户运行；通过 `sudo bash` 执行会配置 root 账户。
+入口会检测环境、展示安装清单并请求确认，结束后汇总完成、跳过和失败项。退出码为 `0` 时仍可能有未完成项，请查看摘要。
 
-安装成功后，当前终端可运行 `exec zsh` 加载配置。Powerlevel10k 图标需要终端使用 Nerd Font v3 字体，例如 [MesloLGS NF](https://github.com/romkatv/powerlevel10k#fonts)。
+请以实际使用环境的账户运行；`sudo bash bootstrap.sh` 会配置 root 账户。
+
+**3. 加载 Zsh 配置。**
+
+```bash
+exec zsh
+```
+
+`shell` 模块修改的默认登录 Shell 在重新登录后生效。Powerlevel10k 图标需要终端使用 Nerd Font v3，例如 [MesloLGS NF](https://github.com/romkatv/powerlevel10k#fonts)。
 
 ## 安装内容
 
-[默认配置](config/default.conf)启用以下全部模块及开发工具，可逐项关闭。
+[默认配置](config/default.conf)启用以下全部模块和工具，可逐项关闭。
 
-| 模块 | 内容 |
+| 模块 | 职责 |
 | --- | --- |
-| `clash` | clashctl、Mihomo 和 yq；使用本地 YAML，在安装期间提供代理，仅支持 Linux |
-| `base` | git、curl、wget、vim、unzip、zsh |
-| `homebrew` | 安装或复用 Homebrew，并配置 PATH |
-| `antidote` | 安装 Antidote，初始化插件清单并预下载清单中的插件 |
-| `powerlevel10k` | Powerlevel10k 主题、gitstatusd、lean 模板和个人覆盖配置 |
-| `tools` | 下表中的开发工具 |
-| `dotfiles` | 复制基础 Shell/Git 配置，按已就绪组件部署可选配置片段 |
+| `clash` | 安装或复用 clashctl、Mihomo 和 yq，在 Linux 安装期间提供代理 |
+| `base` | 安装 git、curl、wget、vim、unzip、zsh |
+| `homebrew` | 安装或复用 Homebrew，准备命令搜索路径 |
+| `antidote` | 安装插件管理器，初始化清单并预下载插件 |
+| `powerlevel10k` | 安装主题和配套 gitstatusd |
+| `tools` | 安装所选开发工具 |
+| `dotfiles` | 部署所选 Shell/Git 配置及已就绪组件的接入片段 |
 | `shell` | 将当前账户的默认登录 Shell 设为 Zsh |
 
-Zsh 本体由 `base` 安装，`antidote` 准备插件管理器和清单，`shell` 设置默认登录 Shell。
+| 工具选择名 | 命令 | 用途 |
+| --- | --- | --- |
+| `uv` | `uv` | Python 环境与依赖管理 |
+| `fzf` | `fzf` | 模糊查找、补全及 Ctrl-R / Ctrl-T / Alt-C 快捷键 |
+| `rg` | `rg` | ripgrep 内容搜索 |
+| `bat` | `bat` | 文件预览与语法高亮 |
+| `eza` | `eza`、`ll`、`la` | 增强文件列表 |
+| `zoxide` | `zoxide`、`z`、`zi` | 按使用记录跳转目录 |
+| `zellij` | `zellij`、`zj` | 终端分屏、标签页与持久会话 |
+| `nvtop` | `nvtop` | GPU 监控，需驱动和设备访问权限 |
+| `jq` | `jq` | JSON 筛选与转换 |
+| `fd` | `fd` | 按文件名、类型等查找文件 |
+| `gh` | `gh` | GitHub 仓库、Issue 和 Pull Request 管理 |
+| [`modelscope-hub`](https://github.com/modelscope/modelscope_hub) | `ms-hub`、`modelscope` | ModelScope 模型、数据集等 Hub 资源管理 |
+| [`huggingface-hub`](https://huggingface.co/docs/huggingface_hub/guides/cli) | `hf` | Hugging Face 模型、数据集和仓库管理 |
 
-默认清单包含 use-omz、Oh My Zsh Git、zsh-completions、zsh-autosuggestions 和 zsh-syntax-highlighting；具体插件由 `.zsh_plugins.txt` 决定。
+工具的别名、补全和快捷键由 `dotfiles` 接入。Debian/Ubuntu 的 `batcat`、`fdfind` 会按需提供为 `bat`、`fd` 别名。NVTOP 在容器中需要暴露 GPU，macOS 仅支持 Apple GPU。
 
-| 开发工具 | 用途 |
+| 环境 | 软件来源与条件 |
 | --- | --- |
-| uv | Python 环境与依赖管理 |
-| fzf | 模糊查找、补全及 Ctrl-R / Ctrl-T / Alt-C 快捷键 |
-| ripgrep（`rg`） | 搜索文件内容 |
-| bat | 带语法高亮地查看文件 |
-| eza | 增强文件列表，提供 `ll`、`la` 别名 |
-| zoxide | 使用 `z`、`zi` 快速跳转目录 |
-| Zellij（`zellij`） | 终端分屏、标签页与持久会话，别名 `zj` |
-| NVTOP（`nvtop`） | GPU 利用率、显存和进程监控 |
-| jq | JSON 筛选、转换与格式化 |
-| fd | 按文件名、扩展名和类型查找文件 |
-| GitHub CLI（`gh`） | 管理 GitHub 仓库、Issue 和 Pull Request |
-| [ModelScope Hub](https://github.com/modelscope/modelscope_hub)（`modelscope-hub`） | 使用 `ms-hub` 下载、上传和管理模型及数据集 |
-| [Hugging Face Hub](https://huggingface.co/docs/huggingface_hub/guides/cli)（`huggingface-hub`） | 使用 `hf` 管理 Hugging Face 模型、数据集和仓库 |
+| Linux | 支持 `apt-get`、`dnf`、`yum`、`pacman`、`zypper`、`apk`；系统包安装需要 root 或 sudo |
+| macOS | 使用 Homebrew；需要普通用户和 Command Line Tools |
 
-Linux 使用 `apt-get`、`dnf`、`yum`、`pacman`、`zypper` 或 `apk`，macOS 使用 Homebrew。root 跳过 Homebrew；Linux 容器不新装 Homebrew。系统包安装需要 root 或 sudo，权限不足或包不可用时会提示。
+root 跳过 Homebrew，Linux 容器不新装 Homebrew。安装和 Zsh 初始化都优先使用 PATH 中的 `brew`，未找到时再搜索标准目录；uv、Zellij 的具体下载方式由安装模块选择。
 
-系统包安装后逐项确认对应命令可用，摘要显示实际命令路径；未找到命令时报告失败。直接下载的 Zellij 在部署前执行 `--version`，确认二进制可以运行。
+系统包安装后逐项确认命令路径；未找到命令时报告失败。直接下载的 Zellij 在部署前执行 `--version`，确认二进制可以运行。
 
-安装和 Zsh 初始化都优先使用 PATH 中的 `brew`，未找到时再搜索标准安装目录。
+### Hub 工具
 
-NVTOP 需要 GPU 驱动及设备访问权限，容器需暴露 GPU；macOS 仅支持 Apple GPU。Debian/Ubuntu 的 `batcat`、`fdfind` 会按需配置为 `bat`、`fd` 别名。
+两个 Hub 工具通过 `uv tool install` 安装到隔离环境，命令位于 `~/.local/bin`。选择任一项会自动补齐 uv；优先复用 Python ≥3.10，缺失时由 uv 下载。Python 项目使用的 SDK 仍需在项目环境中声明和安装。
 
-`gh` 通过现有软件源安装，使用前运行 `gh auth login` 登录 GitHub；升级可参考[官方安装说明](https://github.com/cli/cli/blob/trunk/docs/install_linux.md)。
+完成 `dotfiles` 部署并运行 `exec zsh` 后，再按需登录：
 
-两个 Hub 工具通过 `uv tool install` 安装到隔离环境，命令放在 `~/.local/bin`；选择任一项会先安装或复用 uv。优先使用已有的 Python ≥3.10，缺失时由 uv 下载。项目中的 Python 代码仍需在自己的环境中声明和安装依赖。
+```bash
+ms-hub login
+hf auth login
+```
 
-安装后用 `dotfiles` 接入配置并运行 `exec zsh`，再按需使用 `ms-hub login`、`hf auth login` 登录，确保 Hugging Face 使用配置的持久凭据路径。升级运行 `uv tool upgrade modelscope-hub huggingface-hub`。
+Hub 工具升级使用 `uv tool upgrade modelscope-hub huggingface-hub`。GitHub CLI 使用前运行 `gh auth login`，升级使用原包管理器，安装来源见[官方说明](https://github.com/cli/cli/blob/trunk/docs/install_linux.md)。
 
 ## 按需安装
 
-### 配置文件
+### 选择模块、工具和配置
 
-默认读取 `config/default.conf`。建议复制为被 Git 忽略的 `config/local.conf`，通过 `--config` 显式加载。
+| 参数 | 选择对象 | 使用条件 |
+| --- | --- | --- |
+| `--modules LIST` | 功能模块 | 覆盖配置文件中的模块选择 |
+| `--tools LIST` | 开发工具 | 配合 `tools` 模块使用 |
+| `--dotfiles LIST` | 配置组件 | 必须启用 `dotfiles` 模块，默认选择全部组件 |
 
-| 章节 | 作用 |
-| --- | --- |
-| `[modules]` | 功能模块开关，使用 `true` / `false` |
-| `[tools]` | 开发工具开关，仅在 `tools` 模块启用时生效 |
-| `[clash]` | `config_file` 指定本地 YAML 的绝对路径 |
-| `[options]` | 下载授权 `allow_remote`、冲突策略 `conflict`、GitHub 加速前缀 `github_proxy`、Git 超时 `git_timeout` |
-
-指定配置文件会完整替代默认配置：未列出的模块和工具关闭；选项默认使用 `allow_remote=false`、`conflict=skip`、`github_proxy=`、`git_timeout=600`。值不加引号，不展开 `~` 或 `$HOME`；命令行参数优先于配置文件。
-
-**旧配置迁移：** 将已有 `config/local.conf` 中 `[modules]` 下的 `zsh` 或 `zsh_plugins` 改为 `antidote`；命令行使用 `--modules antidote`。
-
-### 常用命令
+三个参数都接受逗号分隔的名称或 `all`。工具安装与配置部署分别选择；`dotfiles` 可接入已安装的工具。
 
 ```bash
-# 非交互执行，并授权所选组件的上游下载
-bash bootstrap.sh --config config/local.conf --non-interactive --allow-remote
-
 # 仅安装 jq 和 fd
 bash bootstrap.sh --non-interactive --modules tools --tools jq,fd
 
-# 仅安装 GitHub CLI
-bash bootstrap.sh --non-interactive --modules tools --tools gh
-
-# 使用 uv 安装两个 Hub 工具并接入配置；首次安装 uv 时需下载授权
+# 安装两个 Hub 工具并接入配置
 bash bootstrap.sh --non-interactive --modules tools,dotfiles --tools modelscope-hub,huggingface-hub --allow-remote
 
-# 选择全部模块和工具；Linux 仍需配置 Clash YAML
-bash bootstrap.sh --config config/local.conf --modules all --tools all
+# 按个人配置非交互安装，并授权所选组件的上游下载
+bash bootstrap.sh --config config/local.conf --non-interactive --allow-remote
+```
 
-# 查看完整参数和模块说明
+Hub 示例要求已安装 Zsh；全新环境可将模块列表改为 `base,tools,dotfiles`。已有 `.zshrc` 需按冲突策略更新，才能加载对应片段。
+
+> `--non-interactive` 仅关闭输入提示，**不代表授权远程下载**。直接上游下载需设置 `allow_remote=true` 或传入 `--allow-remote`；未授权时交互确认，非交互跳过。包管理器安装、本地配置部署和已有组件复用不受此限制。Linux 启用 Clash 时，代理未就绪仍会停止后续安装。
+
+授权范围包括 clashctl 及 Mihomo/yq、Homebrew/uv 安装器、Antidote 及插件清单中的插件、Powerlevel10k/gitstatusd、Zellij 发布包。安装前会展示具体来源。
+
+### 安装配置文件
+
+默认读取 `config/default.conf`，个人配置通过 `--config` 显式加载。
+
+| 章节 | 内容 |
+| --- | --- |
+| `[modules]` | 模块开关，使用 `true` / `false` |
+| `[tools]` | 工具开关，仅在 `tools` 模块启用时生效 |
+| `[clash]` | `config_file`：可读本地 YAML 的绝对路径 |
+| `[options]` | 下载授权、冲突策略、GitHub 加速前缀、Git 下载超时 |
+
+指定配置文件会完整替代默认配置，未列出的模块和工具关闭。省略的选项使用 `allow_remote=false`、`conflict=skip`、`github_proxy=`、`git_timeout=600`。值不加引号，不展开 `~` 或 `$HOME`；命令行参数优先于配置文件。
+
+完整参数和模块说明：
+
+```bash
 bash bootstrap.sh --help
 bash bootstrap.sh --list-modules
 ```
 
-`--modules` 和 `--tools` 接受逗号分隔的名称或 `all`；`--tools` 需配合 `tools` 模块使用。
+## 配置与更新
 
-Hub 示例要求已安装 Zsh；全新环境可将模块列表改为 `base,tools,dotfiles`。已有 `.zshrc` 按 `skip` / `backup` 冲突策略处理，需确认它已加载本项目的配置片段，再启动 Zsh 登录 Hub。
+### 文件归属与定向更新
 
-`--non-interactive` 仅关闭输入提示。直接上游下载需另外设置 `allow_remote=true` 或传入 `--allow-remote`，范围包括：clashctl 及 Mihomo/yq、Homebrew/uv 安装脚本、Antidote 和 Zsh 插件、Powerlevel10k/gitstatusd、Zellij 发布包。未授权时交互确认，非交互跳过；包管理器安装和本地配置部署不受此开关限制。
+配置以普通文件复制到用户目录，安装后不依赖仓库位置。
 
-## 配置管理
+| 配置 | 默认路径 | 更新方式 |
+| --- | --- | --- |
+| 基础 Zsh 配置 | `~/.zshrc` | 按 `skip` / `backup` 部署 |
+| 工具接入片段 | `~/.config/oh-my-devboom/zsh/` | 选中且组件就绪时部署 |
+| 个人 Zsh 覆盖 | `~/.zshrc.local` | 用户自行创建和维护 |
+| Antidote 插件清单 | `~/.zsh_plugins.txt` | 缺失时初始化，已有内容保留 |
+| Git 通用配置 | `~/.gitconfig` | 按 `skip` / `backup` 部署 |
+| Git 个人配置 | `~/.gitconfig.local` | 用户自行创建和维护 |
+| Powerlevel10k 个人配置 | `~/.p10k.zsh` | 缺失时初始化，已有内容保留 |
 
-配置复制到用户目录，安装后不依赖仓库位置，可直接编辑目标文件。`XDG_CONFIG_HOME`、`XDG_DATA_HOME`、`XDG_CACHE_HOME` 默认分别是 `~/.config`、`~/.local/share`、`~/.cache`；设置 `ZDOTDIR` 时，`.zshrc`、`.zshrc.local`、`.p10k.zsh` 和 `.zsh_plugins.txt` 跟随该目录。
+设置 `ZDOTDIR` 时，`.zshrc`、`.zshrc.local`、`.zsh_plugins.txt` 和 `.p10k.zsh` 跟随该目录。
 
-| 配置 | 默认目标 |
+```bash
+# 只更新两个工具的接入片段
+bash bootstrap.sh --non-interactive --modules dotfiles --dotfiles homebrew,huggingface-hub --conflict backup
+
+# 更新全部已就绪组件的项目配置
+bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
+```
+
+可选配置组件：`zshrc`、`git`、`homebrew`、`clash`、`eza`、`bat`、`fd`、`zellij`、`huggingface-hub`、`fzf`、`zoxide`、`antidote`、`powerlevel10k`。其中 `antidote` 包含插件清单初始化和加载片段，`powerlevel10k` 包含个人配置初始化、即时提示和主题加载片段。
+
+已有 `.zshrc` 需要同步加载顺序时，将 `zshrc` 一并选中。
+
+项目配置的冲突处理如下：
+
+| 目标状态 | 处理方式 |
 | --- | --- |
-| 基础 Zsh 配置 | `~/.zshrc` |
-| 个人 Zsh 覆盖配置 | `~/.zshrc.local`（用户维护） |
-| 可选 Zsh 片段 | `~/.config/oh-my-devboom/zsh/` |
-| Antidote 插件清单 | `~/.zsh_plugins.txt` |
-| Git 通用配置 | `~/.gitconfig` |
-| Powerlevel10k 个人覆盖配置 | `~/.p10k.zsh` |
+| 不存在 | 复制配置 |
+| 普通文件内容相同 | 跳过，不产生备份 |
+| 内容冲突，`skip` | 保留现有文件 |
+| 内容冲突，`backup` | 备份后替换，摘要显示备份路径 |
+| 软链接指向普通文件 | 保留当前内容并转换为普通文件，本次不替换为仓库预设 |
+| 悬空链接或目录链接 | 按冲突策略处理 |
 
-本项目管理的长期程序和数据包括 `XDG_DATA_HOME` 下 `oh-my-devboom/` 中的 Antidote、插件、Powerlevel10k、gitstatusd、fzf 集成脚本和 Shell 历史，以及 `clashctl/` 中的代理程序与配置。
+个人 `.zsh_plugins.txt`、`.p10k.zsh` 只在缺失且组件就绪时初始化，`backup` 也保留已有内容。有效文件软链接会转换为保留内容的普通文件，其他现有路径保持不变。
 
-基础配置始终部署；可选片段在部署阶段确认命令和安装文件就绪，支持接入已有工具。插件配置需 Antidote 就绪，主题覆盖配置需 Powerlevel10k 和 gitstatusd 就绪。`dotfiles` 不自动删除已有片段；卸载工具后需自行删除用户目录中的对应片段。
+`dotfiles` 不自动删除已有片段；卸载工具后需自行删除对应片段。恢复配置备份时，将摘要中列出的备份文件移回原位置。
 
-基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序，仅加载存在的片段。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，片段只保留可选文件、缓存和实际功能分支的判断。安装新工具后重跑 `dotfiles` 接入。
+### 个人设置与插件
 
-个人 alias 和环境变量可写入 `${ZDOTDIR:-$HOME}/.zshrc.local`，在全部工具与主题配置之后加载。该文件由用户自行创建和维护，bootstrap 不部署或覆盖。需要影响工具初始化的参数应在工具加载前设置，例如通过 `.zshenv` 设置路径变量；Powerlevel10k 的个人设置继续写入 `.p10k.zsh`。
+个人 alias 和环境变量写入 `${ZDOTDIR:-$HOME}/.zshrc.local`，在全部工具与主题配置之后加载。影响工具初始化的路径参数应提前设置，例如放在 `.zshenv` 中。
 
-Powerlevel10k 先加载固定版本主题自带的 lean 模板，再加载 `~/.p10k.zsh`，个人覆盖在首次提示符显示前生效。仓库只维护个人差异，可直接编辑该文件；升级主题时需核对覆盖项。`p10k configure` 会将完整配置写入同一用户文件，主题目录中的模板保持不变。
+Git 身份写入个人配置：
 
-`gitstatusd` 安装在 `${XDG_DATA_HOME:-$HOME/.local/share}/oh-my-devboom/gitstatus/`。Zsh 通过上游变量 `GITSTATUS_CACHE_DIR` 指向该数据目录，并设置 `GITSTATUS_AUTO_INSTALL=0`，由 bootstrap 负责安装。
+```bash
+git config --file "$HOME/.gitconfig.local" user.name "Your Name"
+git config --file "$HOME/.gitconfig.local" user.email "you@example.com"
+```
 
-bootstrap 安装 Antidote、初始化清单并预下载插件。之后由 Antidote 原生机制管理：编辑 `${ZDOTDIR:-$HOME}/.zsh_plugins.txt` 后运行 `exec zsh`，`antidote load` 会自动重建静态加载脚本，无需重跑 bootstrap。脚本位于 `~/.cache/oh-my-devboom/plugins.zsh`，插件存放在 `~/.local/share/oh-my-devboom/plugins/`。
+Powerlevel10k 先加载固定主题自带的 lean 模板，再加载个人 `.p10k.zsh`。`p10k configure` 会写入该用户文件；如需采用[仓库的精简预设](config/powerlevel10k/p10k.zsh)，请先手动备份个人文件，再复制到用户配置位置。
+
+Antidote 的[默认清单](config/zsh/zsh_plugins.txt)包含 use-omz、Oh My Zsh Git、补全、自动建议和语法高亮插件。Git 插件提供 `gst`、`gp`、`ga` 等别名。编辑用户 `.zsh_plugins.txt` 后运行 `exec zsh`，Antidote 会按需重建静态加载脚本。
 
 更新未锁定的插件：
 
@@ -160,95 +216,74 @@ antidote update --bundles
 exec zsh
 ```
 
-默认清单用 `pin` 锁定提交，更新命令会跳过这些插件；修改或移除对应 `pin` 后重启 Zsh，再按需更新。
+带 `pin` 的插件会被更新命令跳过。需要采用仓库的新固定提交时，手动同步用户清单中对应的 `pin`，再运行 `exec zsh`。
 
-已有清单由用户维护。需要采用[仓库清单](config/zsh/zsh_plugins.txt)中的固定提交时，手动同步 `${ZDOTDIR:-$HOME}/.zsh_plugins.txt` 中对应的 `pin`，再运行 `exec zsh`。
+<details>
+<summary>目录与缓存：哪些文件需要长期保留？</summary>
 
-Antidote 通过 `use-omz` 加载 Oh My Zsh Git 插件及必要依赖，提供 `gst`（`git status`）、`gp`（`git push`）、`ga`（`git add`）等别名。Zellij 就绪时部署独立片段，使用 `zj` 启动。
+| 变量 | 默认目录 | 用途 |
+| --- | --- | --- |
+| `XDG_CONFIG_HOME` | `~/.config` | 工具接入配置 |
+| `XDG_DATA_HOME` | `~/.local/share` | 程序资源和长期数据 |
+| `XDG_CACHE_HOME` | `~/.cache` | 可重建缓存、下载副本和安装临时文件 |
 
-检测到 `hf` 时，`dotfiles` 部署 `huggingface-hub.zsh`，通过 `HF_TOKEN_PATH` 将活跃 token 默认保存在 `$XDG_DATA_HOME/huggingface/token`；已保存的 token 列表 `stored_tokens` 位于同一目录。显式设置的 `HF_TOKEN_PATH` 优先，其次沿用显式 `HF_HOME` 下的认证路径；模型、Xet 和其他下载缓存位置保持上游配置。该环境变量对加载片段后启动的 CLI 和 Python 进程生效，详见 [Hugging Face 环境变量说明](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables)及[认证文件路径定义](https://github.com/huggingface/huggingface_hub/blob/main/src/huggingface_hub/constants.py)。ModelScope 登录凭据默认位于 `~/.modelscope/credentials/`，与模型缓存分开，见[官方配置说明](https://github.com/modelscope/modelscope_hub#configuration)。
+`$XDG_DATA_HOME/oh-my-devboom/` 保存 Antidote、插件、主题、gitstatusd、fzf 集成脚本和 Shell 历史；同级 `clashctl/` 保存代理程序与配置。`GITSTATUS_CACHE_DIR` 是上游变量名，在本项目中指向数据目录中的 `oh-my-devboom/gitstatus/`；gitstatusd 由 bootstrap 准备，Zsh 启动时不自动补装。
 
-本项目放在 `XDG_CACHE_HOME` 下的补全缓存 `oh-my-devboom/zcompdump`、插件加载脚本 `oh-my-devboom/plugins.zsh` 和即时提示缓存 `p10k-instant-prompt-*.zsh` 可在后续 Zsh 启动时重建。`oh-my-devboom/installer.*` 是供检查的安装脚本副本；Clash、Zellij 的下载与解压目录及代理环境交接文件只在安装期间使用，完成后可清理残留。这些文件不应在安装进行中删除。
+检测到 `hf` 时部署的片段将凭据默认放在 `$XDG_DATA_HOME/huggingface/`，包括 `token` 和 `stored_tokens`。显式 `HF_TOKEN_PATH` 优先，其次沿用显式 `HF_HOME`；模型和其他下载缓存保持上游配置。该设置对加载片段后启动的 CLI/Python 进程生效，见[环境变量说明](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables)和[认证文件路径定义](https://github.com/huggingface/huggingface_hub/blob/main/src/huggingface_hub/constants.py)。ModelScope 凭据默认位于 `~/.modelscope/credentials/`，见[官方配置说明](https://github.com/modelscope/modelscope_hub#configuration)。
 
-Zellij 保留上游存储行为。其[会话恢复数据](https://zellij.dev/documentation/session-resurrection.html)用于恢复已退出的会话，清理系统缓存时应保留。v0.45.1 的默认位置为：
+本项目的 `oh-my-devboom/zcompdump`、`oh-my-devboom/plugins.zsh` 和 `p10k-instant-prompt-*.zsh` 可在后续 Zsh 启动时重建。`oh-my-devboom/installer.*` 是安装器副本；Clash、Zellij 的下载解压目录及代理环境交接文件仅在安装期间使用。可清理安装结束后的残留，安装进行中请保留。
 
-- Linux：`${XDG_CACHE_HOME:-$HOME/.cache}/zellij/contract_version_1/session_info/`。
-- macOS：`~/Library/Caches/org.Zellij-Contributors.Zellij/contract_version_1/session_info/`。
+**Zellij 的会话和授权记录需要单独保留。** 本项目保留上游行为，固定版本 v0.45.1 的会话恢复数据位于：
 
-路径定义见[固定版本源码](https://github.com/zellij-org/zellij/blob/v0.45.1/zellij-utils/src/consts.rs)。Zellij 的系统缓存目录还保存插件授权记录 `permissions.kdl`，删除后需重新授权。上述可重建缓存的说明仅适用于本项目列出的文件。
+| 平台 | 会话恢复目录 |
+| --- | --- |
+| Linux | `${XDG_CACHE_HOME:-$HOME/.cache}/zellij/contract_version_1/session_info/` |
+| macOS | `~/Library/Caches/org.Zellij-Contributors.Zellij/contract_version_1/session_info/` |
 
-部署规则：
+同一缓存根目录的 `permissions.kdl` 保存插件授权记录。删除会话数据会失去对应恢复记录，删除授权记录后需重新授权。详见[会话恢复说明](https://zellij.dev/documentation/session-resurrection.html)和[固定版本路径定义](https://github.com/zellij-org/zellij/blob/v0.45.1/zellij-utils/src/consts.rs)。
 
-- 目标不存在时复制，普通文件内容相同时跳过。
-- 内容冲突时默认 `skip`，保留原配置；`backup` 先备份再替换，日志显示备份路径。
-- 已有软链接指向普通文件时，优先转换为保留当前内容的普通文件，本次不替换为仓库预设；悬空链接或目录链接按冲突策略处理。
+</details>
 
-Antidote 插件清单已存在时保留，缺失时直接复制仓库默认清单；`backup` 也不会替换已有清单内容。
+<details>
+<summary>已有环境迁移：模块名、插件加载及数据目录</summary>
 
-在仓库目录中执行：
+**旧模块名。** 将个人安装配置中 `[modules]` 下的 `zsh` 或 `zsh_plugins` 改为 `antidote`。
 
-```bash
-# 保留当前配置，将已有文件软链接转换为普通文件
-bash bootstrap.sh --non-interactive --modules dotfiles --conflict skip
-
-# 备份冲突配置，再部署仓库预设
-bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
-```
-
-已有 `.zshrc` 需按上述规则更新后才能加载模块片段。恢复备份时，将日志中的备份文件移回原位置。
-
-已有完整 `.p10k.zsh` 可继续使用。要采用仓库的精简覆盖配置，运行上方 `dotfiles --conflict backup` 命令；其他冲突配置也会备份更新，然后运行 `exec zsh`。
-
-已有环境切换到 Antidote 原生加载时，更新加载配置后重启 Zsh；已有插件清单保留：
+**切换到 Antidote 原生加载。** 更新基础配置与相关片段，再重启 Zsh；用户插件清单会保留。
 
 ```bash
-bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
+bash bootstrap.sh --non-interactive --modules dotfiles --dotfiles zshrc,antidote,fzf,zoxide --conflict backup
 exec zsh
 ```
 
-个人 Git 身份单独保存在 `~/.gitconfig.local`：
+**gitstatusd 目录。** 若已有程序位于缓存目录，重新安装到数据目录并更新加载配置：
 
 ```bash
-git config --file "$HOME/.gitconfig.local" user.name "Your Name"
-git config --file "$HOME/.gitconfig.local" user.email "you@example.com"
-```
-
-### gitstatusd 目录迁移
-
-已有环境若将 `gitstatusd` 安装在 `XDG_CACHE_HOME` 下，可在仓库目录执行以下命令，将程序安装到数据目录并更新 Zsh 加载配置：
-
-```bash
-bash bootstrap.sh --non-interactive --modules powerlevel10k,dotfiles --allow-remote --conflict backup
+bash bootstrap.sh --non-interactive --modules powerlevel10k,dotfiles --dotfiles zshrc,powerlevel10k --allow-remote --conflict backup
 exec zsh
 ```
 
-此命令会备份并更新 `dotfiles` 管理的所有冲突配置，个人修改可从备份恢复。确认新配置正常后，可自行删除旧的 `${XDG_CACHE_HOME:-$HOME/.cache}/oh-my-devboom/gitstatus/` 目录。
+确认正常后，可自行删除旧的 `${XDG_CACHE_HOME:-$HOME/.cache}/oh-my-devboom/gitstatus/`。个人 `.p10k.zsh` 会保留。
 
-### Hugging Face 认证目录迁移
-
-已有环境先确认 `hf` 可用，再在仓库目录更新配置：
+**Hugging Face 凭据目录。** 确认 `hf` 可用，更新配置并重新登录：
 
 ```bash
-bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
+bash bootstrap.sh --non-interactive --modules dotfiles --dotfiles zshrc,huggingface-hub --conflict backup
 exec zsh
 hf auth login
 ```
 
-此命令会备份并更新 `dotfiles` 管理的所有冲突配置。加载新配置后重新登录即可在新位置保存凭据；需要保留多个已保存凭据时，可将旧认证目录中的 `token`、`stored_tokens` 一起迁移到新目录，保留原文件权限。项目不会自动迁移认证文件；确认认证正常后再清理旧副本。
+需要保留多个已保存凭据时，将旧目录的 `token`、`stored_tokens` 一起迁移到新目录并保留原权限。确认认证正常后再清理旧副本。
+
+</details>
 
 ## 网络与代理
 
-`clash` 使用 [nelvko/clashctl](https://github.com/nelvko/clashctl)，要求 Linux 和 Bash 4+，安装在 `${XDG_DATA_HOME:-$HOME/.local/share}/clashctl`，与 `oh-my-devboom` 数据目录同级。
+Linux Clash 模块使用 [clashctl](https://github.com/nelvko/clashctl)，要求 Bash 4+，安装在 `${XDG_DATA_HOME:-$HOME/.local/share}/clashctl`。
 
-clashctl 固定提交 `e38d643`，从 [Gitee 镜像](https://gitee.com/back_door/clashctl)直连下载；[组件发布包](https://gitee.com/back_door/clashctl/releases/tag/mihomo-v1.19.33-yq-v4.54.1)固定 Mihomo v1.19.33、yq v4.54.1，支持 Linux x86_64/aarch64。源码和安装包均校验 SHA-256，不依赖 `github_proxy`。
+安装期间的流程为：**导入本地 YAML → 启动代理并检查联网 → 执行后续安装 → 关闭内核**。报错退出或可捕获的中断也会触发关闭，程序与配置保留。
 
-安装时使用已下载归档并跳过 GitHub 版本查询；系统依赖走发行版源，已有完整安装直接复用。
-
-- 从服务器本地 YAML 导入配置；Clash 就绪并通过联网检查后，才继续后续安装。未就绪会停止安装。
-- 代理启用后，本轮下载使用原始 GitHub URL，不再叠加 GitHub 加速前缀。
-- 安装结束、报错退出或可捕获的中断时关闭该目录的 Clash 内核，保留程序与配置。
-
-部署对应 Zsh 片段后，可手动使用：
+部署 Clash 配置片段后，可手动使用：
 
 ```bash
 clashctl on
@@ -256,74 +291,118 @@ clashctl off --stop
 clashctl status
 ```
 
-Clash 尚未启用时，GitHub 下载默认使用第三方加速前缀 `https://ghfast.top/`，可通过 `[options] github_proxy` 修改或置空直连。该前缀覆盖本项目直接发起的 GitHub 文件下载和 Git 请求（Git 加速需 Git 2.31+），不覆盖包管理器或上游安装器内部的下载。
+| 下载对象 | 来源与固定方式 |
+| --- | --- |
+| clashctl 源码 | [Gitee 镜像](https://gitee.com/back_door/clashctl)，固定提交 `e38d643`，校验 SHA-256 |
+| Mihomo / yq | [Gitee 组件发布包](https://gitee.com/back_door/clashctl/releases/tag/mihomo-v1.19.33-yq-v4.54.1)，固定 v1.19.33 / v4.54.1，校验 SHA-256；支持 Linux x86_64/aarch64 |
+| Antidote、默认插件、主题和直接下载的发布包 | 固定提交或版本，具体值见[安装模块](modules/)和[插件清单](config/zsh/zsh_plugins.txt) |
+| Homebrew / uv 安装器 | 随上游更新，执行前展示来源和下载脚本路径 |
 
-uv 安装 Hub 工具需要访问 PyPI，缺少合适的 Python 时还需访问 GitHub；`github_proxy` 不改写 uv 内部的下载请求。
+已有完整 clashctl 安装会复用；首次安装使用已校验归档并跳过 GitHub 版本查询，系统依赖仍走发行版源。
 
-日常插件下载和更新由 Antidote 发起，需自行配置网络或代理；bootstrap 的 `github_proxy`、`git_timeout` 和下载授权只作用于安装阶段。
+Clash 启用前，项目直接发起的 GitHub 文件下载和 Git 请求默认使用 `https://ghfast.top/`，可通过 `[options] github_proxy` 修改或置空；Git 加速需要 Git 2.31+。Clash 就绪后，本轮停用该加速前缀。
 
-安装前会显示上游来源，源码固定提交与发布包校验见相应[安装模块](modules/)。Homebrew、uv 安装脚本随上游更新。
+包管理器、上游安装器和 uv 内部下载不受该前缀改写。Hub 工具需要访问 PyPI，缺少 Python 时还可能需要访问 GitHub。日常 Antidote 下载与更新使用当时的网络环境；安装配置中的 `github_proxy`、`git_timeout` 和下载授权仅作用于 bootstrap。
 
 ## 常见问题
 
-**安装后仍是 Bash？**
+<details>
+<summary>安装后为什么仍然是 Bash？</summary>
 
-先检查摘要中的 `antidote`、`powerlevel10k` 和 `dotfiles` 是否完成，再运行 `exec zsh`。`shell` 模块修改登录 Shell，重新登录后生效；容器平台若固定启动 `bash`，还需调整平台的终端启动命令。
+当前终端需要运行 `exec zsh`。默认登录 Shell 的变更在重新登录后生效；容器平台若固定启动 `bash`，还需调整终端启动命令。若配置未生效，查看摘要中 Zsh、插件、主题及 `dotfiles` 的完成情况。
 
-**可以重复执行吗？如何更新？**
+</details>
 
-可以。已有工具按规则复用，不自动升级；工具升级使用原包管理器或上游提供的更新方式。更新仓库预设后重跑 `dotfiles`，配置冲突按 `skip/backup` 处理。
+<details>
+<summary>可以重复执行吗？如何升级？</summary>
 
-**fzf 已安装，但快捷键不可用？**
+可以。已有工具按模块规则复用，升级使用原包管理器或上游提供的方式。更新仓库预设后，通过 `--dotfiles` 部署所需配置；个人插件清单和主题配置自行维护。仓库固定版本的调整见[项目维护](#项目维护)。
+
+</details>
+
+<details>
+<summary>fzf 已安装，但快捷键不可用？</summary>
 
 外部升级或更换 fzf 后，刷新集成脚本并接入配置：
 
 ```bash
-bash bootstrap.sh --non-interactive --modules tools,dotfiles --tools fzf
+bash bootstrap.sh --non-interactive --modules tools,dotfiles --tools fzf --dotfiles zshrc,fzf
 ```
 
-旧 Debian/Ubuntu 的集成脚本从匹配版本的 APT 包提取；若仓库已不提供该版本，先升级 fzf。已有 `.zshrc` 仍按配置冲突规则处理。
+旧 Debian/Ubuntu 的脚本从匹配版本的 APT 包提取；若软件源不再提供该版本，先升级 fzf。已有 `.zshrc` 仍按 `skip` / `backup` 处理。
 
-**下载失败或安装有跳过项？**
+</details>
 
-查看摘要中的原因和重试命令。Git 任务默认限时 600 秒，可在 `[options] git_timeout` 调整；同时检查网络、加速前缀和下载授权。退出码为零也可能存在跳过项。保存完整日志可使用 `> install.log 2>&1`。
+<details>
+<summary>下载失败或摘要中有跳过项？</summary>
 
-## 项目结构与开发
+按摘要中的原因处理，再使用附带的重试命令。Git 下载默认限时 600 秒，可调整 `[options] git_timeout`，并检查网络与代理。退出码 `0` 不代表所有组件完成；需要保留日志时，可在安装命令后追加 `> install.log 2>&1`。
+
+</details>
+
+## 项目维护
 
 ```text
-bootstrap.sh     # 统一入口
-modules/         # 按功能划分的安装模块
-lib/             # 系统检测、下载、包管理与配置部署
-config/          # 默认安装配置和程序配置
-scripts/         # 镜像与固定版本维护
-tests/run.sh     # 基础检查
+bootstrap.sh             # 安装入口
+modules/                 # 功能模块
+lib/                     # 系统检测、下载、包管理与配置部署
+config/                  # 安装配置和程序配置
+scripts/update-pins.sh   # 固定版本维护
+scripts/update-clash.sh  # Clash 镜像维护
+tests/run.sh             # 基础检查
 ```
 
-基础检查使用临时 HOME 和模拟的包管理、下载命令：
+### 本地检查与 CI
+
+完整检查需要 Zsh 和 ShellCheck，在仓库目录运行：
 
 ```bash
-bash tests/run.sh
+git ls-files -z '*.sh' | xargs -0 -n 1 /bin/bash -n
+git ls-files -z '*.zsh' 'config/zsh/zshrc' | xargs -0 -n 1 zsh -n
+git ls-files -z '*.sh' | xargs -0 shellcheck --severity=warning
+/bin/bash tests/run.sh
 ```
 
-CI 在 Ubuntu 与 macOS 上准备 Zsh、ShellCheck 并输出实际版本。Bash 语法检查和现有检查套件使用 `/bin/bash`，保留 macOS 的 Bash 3.2 验证；所有 Zsh 配置和片段使用 `zsh -n` 检查，Bash 脚本使用 ShellCheck 静态分析。
+CI 在 Ubuntu 与 macOS 上准备检查工具并输出实际版本，保留 macOS `/bin/bash` 的 Bash 3.2 验证。现有检查使用临时 HOME 和模拟的包管理、下载命令；Clash 完整安装、终端交互和 GPU 展示仍需在目标环境验证。
 
-Clash 的完整安装流程、终端交互和 GPU 展示仍需在目标环境实机验证。
+### 更新仓库固定版本
 
-### 维护 Clash 镜像
-
-需要 `git`、`gh`、官方 `gitee` CLI、`jq`、`curl` 和 `shasum`；`gh`、`gitee` 分别登录 `PercyWei`、`back_door`。可用 `GITEE_BIN` 指定 Gitee CLI 的绝对路径，`CLASHCTL_REPO_DIR` 指定本地克隆目录，默认使用仓库同级的 `clashctl`。
+`scripts/update-pins.sh` 使用 Git、curl、jq、tar 和 shasum 核对上游，再更新对应安装模块或默认插件清单。目标文件需没有未提交修改。以下示例使用当前固定值，维护时替换为已审阅的目标版本或引用：
 
 ```bash
-# 同步上游 master 到 PercyWei/clashctl 和 back_door/clashctl，不改安装固定版本
+bash scripts/update-pins.sh zellij v0.45.1
+bash scripts/update-pins.sh powerlevel10k d05a1b00f9a61f9578bf9dc19b8451942dde8734
+bash scripts/update-pins.sh antidote v2.3.0
+bash scripts/update-pins.sh plugin zsh-users/zsh-syntax-highlighting 0.8.0
+```
+
+| 对象 | 写入前的核对 |
+| --- | --- |
+| Zellij | 稳定 Release、四个平台资产的官方摘要及归档成员 |
+| Powerlevel10k | Git commit、所选主题 `gitstatus/install.info` 中四个平台的配套版本与归档；gitstatus 不单独升级 |
+| Antidote | 稳定 tag 对应的实际 commit 和安装接口 |
+| 默认插件 | 清单中已有仓库的 Git 引用，实际解析为 commit 并检出 |
+
+脚本仅更新仓库文件。随后审阅 `git diff`、核对文档与上游接口，并在隔离环境验证安装及重复执行。用户插件清单中的 pin 仍需手动同步。
+
+<details>
+<summary>维护 Clash 的 GitHub / Gitee 镜像</summary>
+
+需要 Git、gh、官方 gitee CLI、jq、curl 和 shasum；`gh`、`gitee` 分别登录 `PercyWei`、`back_door`。`GITEE_BIN` 可指定 Gitee CLI 的绝对路径，`CLASHCTL_REPO_DIR` 可指定本地克隆目录，默认使用仓库同级的 `clashctl`。
+
+```bash
+# 同步上游 master，不改变安装固定版本
 bash scripts/update-clash.sh sync
 
-# 包含同步，更新指定提交及源码归档 SHA-256；安装器适配仍需人工审查
+# 同步后固定指定提交及源码归档摘要
 bash scripts/update-clash.sh source e38d643725594c38c3fb02f355a2c89eba9c296c
 
 # 发布指定稳定版本的组件包
 bash scripts/update-clash.sh packages v1.19.33 v4.54.1
 ```
 
-`packages` 按官方 Release 提供的 SHA-256 摘要校验安装包，发布或复用 Gitee 附件，经匿名下载核对后更新本地固定版本、README 和默认配置。旧 Release 和附件保留，相同内容复用，不同内容报错，可重复执行。
+`packages` 按官方 Release 摘要校验安装包，发布或复用 Gitee 附件，经匿名下载核对后更新本地固定值、README 和默认配置。旧附件保留，相同内容复用，不同内容报错。
 
-`source`、`packages` 要求 `modules/clash.sh`、`README.md`、`config/default.conf` 无未提交改动。脚本不安装或升级服务器，也不提交本地变更。
+`source`、`packages` 要求 `modules/clash.sh`、`README.md`、`config/default.conf` 无未提交修改。脚本不安装或升级服务器，也不提交变更。
+
+</details>
