@@ -12,9 +12,9 @@ module_powerlevel10k() {
         return 2
     fi
     if [[ -e "$theme_dir" || -L "$theme_dir" ]]; then
-        if [[ ! -f "$theme_dir/powerlevel10k.zsh-theme" ]] ||
+        if [[ ! -f "$theme_dir/powerlevel10k.zsh-theme" || ! -f "$theme_dir/config/p10k-lean.zsh" ]] ||
             [[ "$(git -C "$theme_dir" rev-parse HEAD 2>/dev/null)" != "$theme_commit" ]]; then
-            record_result skipped Powerlevel10k "现有目录与固定提交 ${theme_commit:0:7} 不符，已保留：$theme_dir" '检查并自行整理现有目录后，重试 powerlevel10k 模块。'
+            record_result skipped Powerlevel10k "现有目录不完整或与固定提交 ${theme_commit:0:7} 不符，已保留：$theme_dir" '检查并自行整理现有目录后，重试 powerlevel10k 模块。'
             return 2
         fi
         record_result ready Powerlevel10k "固定提交 ${theme_commit:0:7}；$theme_dir"
@@ -123,5 +123,5 @@ module_powerlevel10k() {
     else
         record_result ready gitstatusd "缓存已就绪：$cache/$daemon"
     fi
-    log_info 'Powerlevel10k 与 gitstatusd 已就绪；dotfiles 模块部署提示符预设。'
+    log_info 'Powerlevel10k 与 gitstatusd 已就绪；dotfiles 模块部署个人覆盖配置。'
 }

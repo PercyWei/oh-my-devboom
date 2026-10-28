@@ -41,7 +41,7 @@ bash bootstrap.sh --config config/local.conf
 | `base` | git、curl、wget、vim、unzip、zsh |
 | `homebrew` | 安装或复用 Homebrew，并配置 PATH |
 | `zsh_plugins` | Antidote、Oh My Zsh Git 插件、zsh-completions、zsh-autosuggestions、zsh-syntax-highlighting |
-| `powerlevel10k` | Powerlevel10k 主题、gitstatusd 和个人主题预设 |
+| `powerlevel10k` | Powerlevel10k 主题、gitstatusd、lean 模板和个人覆盖配置 |
 | `tools` | 下表中的开发工具 |
 | `dotfiles` | 复制基础 Shell/Git 配置，按已就绪组件部署可选配置片段 |
 | `shell` | 将当前账户的默认登录 Shell 设为 Zsh |
@@ -128,11 +128,13 @@ bash bootstrap.sh --list-modules
 | 可选 Zsh 片段 | `~/.config/oh-my-devboom/zsh/` |
 | Antidote 插件清单 | `~/.config/oh-my-devboom/zsh_plugins.txt` |
 | Git 通用配置 | `~/.gitconfig` |
-| Powerlevel10k 主题预设 | `~/.p10k.zsh` |
+| Powerlevel10k 个人覆盖配置 | `~/.p10k.zsh` |
 
-基础配置始终部署；可选片段按实际命令和安装文件是否就绪部署，支持接入已有工具。插件清单需已生成插件静态配置，主题预设需 Powerlevel10k 和 gitstatusd 就绪。单独重跑 `dotfiles` 不会因为本次未选择某个安装模块而删除它的配置。
+基础配置始终部署；可选片段按实际命令和安装文件是否就绪部署，支持接入已有工具。插件清单需已生成插件静态配置，主题覆盖配置需 Powerlevel10k 和 gitstatusd 就绪。单独重跑 `dotfiles` 不会因为本次未选择某个安装模块而删除它的配置。
 
-基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，安装新工具后重跑 `dotfiles` 接入。修改插件清单后，重跑 `zsh_plugins` 模块生成静态配置；主题可直接修改 `.p10k.zsh` 或运行 `p10k configure`。
+基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，安装新工具后重跑 `dotfiles` 接入。修改插件清单后，重跑 `zsh_plugins` 模块生成静态配置。
+
+Powerlevel10k 先加载固定版本主题自带的 lean 模板，再加载 `~/.p10k.zsh` 并刷新提示符。仓库只维护个人差异，可直接编辑该文件；升级主题时需核对覆盖项。`p10k configure` 会将完整配置写入同一用户文件，主题目录中的模板保持不变。
 
 Antidote 通过 `use-omz` 加载 Oh My Zsh Git 插件及必要依赖，提供 `gst`（`git status`）、`gp`（`git push`）、`ga`（`git add`）等别名。Zellij 就绪时部署独立片段，使用 `zj` 启动。
 
@@ -153,6 +155,8 @@ bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
 ```
 
 已有 `.zshrc` 需按上述规则更新后才能加载模块片段。恢复备份时，将日志中的备份文件移回原位置。
+
+已有完整 `.p10k.zsh` 可继续使用。要采用仓库的精简覆盖配置，运行上方 `dotfiles --conflict backup` 命令；其他冲突配置也会备份更新，然后运行 `exec zsh`。
 
 已有环境更新 Git 插件和别名时，先部署配置，再生成插件静态文件：
 

@@ -268,8 +268,9 @@ RELEASE
         backups=("$HOME/existing.backup."*)
         assert_equal 1 "${#backups[@]}" 'Repeated deployment creates no new backup'
 
-        mkdir -p "$XDG_DATA_HOME/oh-my-devboom/powerlevel10k" "$XDG_CACHE_HOME/oh-my-devboom/gitstatus"
+        mkdir -p "$XDG_DATA_HOME/oh-my-devboom/powerlevel10k/config" "$XDG_CACHE_HOME/oh-my-devboom/gitstatus"
         printf '# theme fixture\n' > "$XDG_DATA_HOME/oh-my-devboom/powerlevel10k/powerlevel10k.zsh-theme"
+        printf '# lean fixture\n' > "$XDG_DATA_HOME/oh-my-devboom/powerlevel10k/config/p10k-lean.zsh"
         for platform in linux-x86_64 linux-aarch64 darwin-x86_64 darwin-arm64; do
             printf '#!/bin/sh\nexit 99\n' > "$XDG_CACHE_HOME/oh-my-devboom/gitstatus/gitstatusd-$platform"
             chmod +x "$XDG_CACHE_HOME/oh-my-devboom/gitstatus/gitstatusd-$platform"

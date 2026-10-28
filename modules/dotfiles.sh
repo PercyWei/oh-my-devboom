@@ -30,6 +30,7 @@ module_dotfiles() {
                     source="$ROOT_DIR/config/powerlevel10k/p10k.zsh"; destination="${ZDOTDIR:-$HOME}/.p10k.zsh"
                 fi
                 if [[ -r "$data_dir/powerlevel10k/powerlevel10k.zsh-theme" &&
+                      -r "$data_dir/powerlevel10k/config/p10k-lean.zsh" &&
                       -x "$XDG_CACHE_HOME/oh-my-devboom/gitstatus/gitstatusd-$daemon_os-$daemon_arch" ]]; then ready=1; fi
                 ;;
             homebrew)
