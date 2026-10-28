@@ -15,7 +15,7 @@ module_label() {
         clash) printf 'Clash 代理' ;;
         base) printf '基础工具' ;;
         homebrew) printf 'Homebrew' ;;
-        zsh_plugins) printf 'Zsh 插件' ;;
+        antidote) printf 'Antidote' ;;
         powerlevel10k) printf 'Powerlevel10k' ;;
         tools) printf '开发工具' ;;
         dotfiles) printf '配置部署' ;;

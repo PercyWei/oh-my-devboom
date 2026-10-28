@@ -1,6 +1,6 @@
 # oh-my-devboom
 
-轻量、模块化的个人开发环境初始化工具，适用于 Linux 服务器、Docker 容器和 macOS。
+轻量、模块化的个人开发环境初始准备器，适用于 Linux 服务器、Docker 容器和 macOS。
 
 使用 Bash 编写，无需预装 Python 或 Node.js。支持按需安装、重复执行和配置备份，已有工具按规则复用，配置以普通文件部署。
 
@@ -40,13 +40,15 @@ bash bootstrap.sh --config config/local.conf
 | `clash` | clashctl、Mihomo 和 yq；使用本地 YAML，在安装期间提供代理，仅支持 Linux |
 | `base` | git、curl、wget、vim、unzip、zsh |
 | `homebrew` | 安装或复用 Homebrew，并配置 PATH |
-| `zsh_plugins` | Antidote、Oh My Zsh Git 插件、zsh-completions、zsh-autosuggestions、zsh-syntax-highlighting |
+| `antidote` | 安装 Antidote，初始化插件清单并预下载清单中的插件 |
 | `powerlevel10k` | Powerlevel10k 主题、gitstatusd、lean 模板和个人覆盖配置 |
 | `tools` | 下表中的开发工具 |
 | `dotfiles` | 复制基础 Shell/Git 配置，按已就绪组件部署可选配置片段 |
 | `shell` | 将当前账户的默认登录 Shell 设为 Zsh |
 
-Zsh 本体由 `base` 安装，插件和默认登录 Shell 分别由 `zsh_plugins`、`shell` 控制。
+Zsh 本体由 `base` 安装，`antidote` 准备插件管理器和清单，`shell` 设置默认登录 Shell。
+
+默认清单包含 use-omz、Oh My Zsh Git、zsh-completions、zsh-autosuggestions 和 zsh-syntax-highlighting；具体插件由 `.zsh_plugins.txt` 决定。
 
 | 开发工具 | 用途 |
 | --- | --- |
@@ -89,7 +91,7 @@ NVTOP 需要 GPU 驱动及设备访问权限，容器需暴露 GPU；macOS 仅�
 
 指定配置文件会完整替代默认配置：未列出的模块和工具关闭；选项默认使用 `allow_remote=false`、`conflict=skip`、`github_proxy=`、`git_timeout=600`。值不加引号，不展开 `~` 或 `$HOME`；命令行参数优先于配置文件。
 
-**旧配置迁移：** 将已有 `config/local.conf` 中 `[modules]` 下的 `zsh` 改为 `zsh_plugins`；命令行使用 `--modules zsh_plugins`。
+**旧配置迁移：** 将已有 `config/local.conf` 中 `[modules]` 下的 `zsh` 或 `zsh_plugins` 改为 `antidote`；命令行使用 `--modules antidote`。
 
 ### 常用命令
 
@@ -120,21 +122,32 @@ bash bootstrap.sh --list-modules
 
 ## 配置管理
 
-配置复制到用户目录，安装后不依赖仓库位置，可直接编辑目标文件。`XDG_CONFIG_HOME` 默认是 `~/.config`；设置 `ZDOTDIR` 时，`.zshrc` 和 `.p10k.zsh` 跟随该目录。
+配置复制到用户目录，安装后不依赖仓库位置，可直接编辑目标文件。`XDG_CONFIG_HOME` 默认是 `~/.config`；设置 `ZDOTDIR` 时，`.zshrc`、`.p10k.zsh` 和 `.zsh_plugins.txt` 跟随该目录。
 
 | 配置 | 默认目标 |
 | --- | --- |
 | 基础 Zsh 配置 | `~/.zshrc` |
 | 可选 Zsh 片段 | `~/.config/oh-my-devboom/zsh/` |
-| Antidote 插件清单 | `~/.config/oh-my-devboom/zsh_plugins.txt` |
+| Antidote 插件清单 | `~/.zsh_plugins.txt` |
 | Git 通用配置 | `~/.gitconfig` |
 | Powerlevel10k 个人覆盖配置 | `~/.p10k.zsh` |
 
-基础配置始终部署；可选片段在部署阶段确认命令和安装文件就绪，支持接入已有工具。插件清单需已生成插件静态配置，主题覆盖配置需 Powerlevel10k 和 gitstatusd 就绪。`dotfiles` 不自动删除已有片段；卸载工具后需自行删除用户目录中的对应片段。
+基础配置始终部署；可选片段在部署阶段确认命令和安装文件就绪，支持接入已有工具。插件配置需 Antidote 就绪，主题覆盖配置需 Powerlevel10k 和 gitstatusd 就绪。`dotfiles` 不自动删除已有片段；卸载工具后需自行删除用户目录中的对应片段。
 
-基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序，仅加载存在的片段。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，片段只保留可选文件、缓存和实际功能分支的判断。安装新工具后重跑 `dotfiles` 接入；修改插件清单后，重跑 `zsh_plugins` 模块生成静态配置。
+基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序，仅加载存在的片段。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，片段只保留可选文件、缓存和实际功能分支的判断。安装新工具后重跑 `dotfiles` 接入。
 
 Powerlevel10k 先加载固定版本主题自带的 lean 模板，再加载 `~/.p10k.zsh` 并刷新提示符。仓库只维护个人差异，可直接编辑该文件；升级主题时需核对覆盖项。`p10k configure` 会将完整配置写入同一用户文件，主题目录中的模板保持不变。
+
+bootstrap 安装 Antidote、初始化清单并预下载插件。之后由 Antidote 原生机制管理：编辑 `${ZDOTDIR:-$HOME}/.zsh_plugins.txt` 后运行 `exec zsh`，`antidote load` 会自动重建静态加载脚本，无需重跑 bootstrap。脚本位于 `~/.cache/oh-my-devboom/plugins.zsh`，插件存放在 `~/.local/share/oh-my-devboom/plugins/`。
+
+更新未锁定的插件：
+
+```bash
+antidote update --bundles
+exec zsh
+```
+
+默认清单用 `pin` 锁定提交，更新命令会跳过这些插件；修改或移除对应 `pin` 后重启 Zsh，再按需更新。
 
 Antidote 通过 `use-omz` 加载 Oh My Zsh Git 插件及必要依赖，提供 `gst`（`git status`）、`gp`（`git push`）、`ga`（`git add`）等别名。Zellij 就绪时部署独立片段，使用 `zj` 启动。
 
@@ -143,6 +156,10 @@ Antidote 通过 `use-omz` 加载 Oh My Zsh Git 插件及必要依赖，提供 `g
 - 目标不存在时复制，普通文件内容相同时跳过。
 - 内容冲突时默认 `skip`，保留原配置；`backup` 先备份再替换，日志显示备份路径。
 - 已有软链接指向普通文件时，优先转换为保留当前内容的普通文件，本次不替换为仓库预设；悬空链接或目录链接按冲突策略处理。
+
+Antidote 插件清单仅在缺失时部署；已有清单由用户维护，`backup` 也不会替换其内容。
+
+清单迁移：新路径缺失时，优先复制旧 `${XDG_CONFIG_HOME:-$HOME/.config}/oh-my-devboom/zsh_plugins.txt`，并保留旧文件；两处都存在时使用新路径，均不存在时复制默认清单。
 
 在仓库目录中执行：
 
@@ -158,15 +175,12 @@ bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
 
 已有完整 `.p10k.zsh` 可继续使用。要采用仓库的精简覆盖配置，运行上方 `dotfiles --conflict backup` 命令；其他冲突配置也会备份更新，然后运行 `exec zsh`。
 
-已有环境更新 Git 插件和别名时，先部署配置，再生成插件静态文件：
+已有环境切换到 Antidote 原生加载时，更新加载配置后重启 Zsh；已有插件清单保留：
 
 ```bash
 bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
-bash bootstrap.sh --non-interactive --modules zsh_plugins --allow-remote
 exec zsh
 ```
-
-需要 Clash 代理时，第二步改用 `--config config/local.conf --modules clash,zsh_plugins`。
 
 个人 Git 身份单独保存在 `~/.gitconfig.local`：
 
@@ -199,13 +213,15 @@ Clash 尚未启用时，GitHub 下载默认使用第三方加速前缀 `https://
 
 uv 安装 Hub 工具需要访问 PyPI，缺少合适的 Python 时还需访问 GitHub；`github_proxy` 不改写 uv 内部的下载请求。
 
+日常插件下载和更新由 Antidote 发起，需自行配置网络或代理；bootstrap 的 `github_proxy`、`git_timeout` 和下载授权只作用于安装阶段。
+
 安装前会显示上游来源，源码固定提交与发布包校验见相应[安装模块](modules/)。Homebrew、uv 安装脚本随上游更新。
 
 ## 常见问题
 
 **安装后仍是 Bash？**
 
-先检查摘要中的 `zsh_plugins`、`powerlevel10k` 和 `dotfiles` 是否完成，再运行 `exec zsh`。`shell` 模块修改登录 Shell，重新登录后生效；容器平台若固定启动 `bash`，还需调整平台的终端启动命令。
+先检查摘要中的 `antidote`、`powerlevel10k` 和 `dotfiles` 是否完成，再运行 `exec zsh`。`shell` 模块修改登录 Shell，重新登录后生效；容器平台若固定启动 `bash`，还需调整平台的终端启动命令。
 
 **可以重复执行吗？如何更新？**
 

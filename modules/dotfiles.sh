@@ -4,12 +4,13 @@ module_dotfiles() {
     local pair source destination ready result status=0
     local config_dir="$XDG_CONFIG_HOME/oh-my-devboom/zsh"
     local data_dir="$XDG_DATA_HOME/oh-my-devboom"
+    local legacy_plugins="$XDG_CONFIG_HOME/oh-my-devboom/zsh_plugins.txt"
     local daemon_os=$OS daemon_arch=$ARCH
     if [[ "$OS" == macos ]]; then
         daemon_os=darwin
         [[ "$ARCH" != aarch64 ]] || daemon_arch=arm64
     fi
-    for pair in zshrc git plugin-list powerlevel10k-preset homebrew clash eza bat fd zellij fzf zoxide plugins powerlevel10k-instant powerlevel10k; do
+    for pair in zshrc git plugin-list powerlevel10k-preset homebrew clash eza bat fd zellij fzf zoxide antidote powerlevel10k-instant powerlevel10k; do
         source="$ROOT_DIR/config/zsh/modules/$pair.zsh"
         destination="$config_dir/$pair.zsh"
         ready=0
@@ -18,12 +19,19 @@ module_dotfiles() {
                 source="$ROOT_DIR/config/zsh/zshrc"; destination="${ZDOTDIR:-$HOME}/.zshrc"; ready=1 ;;
             git)
                 source="$ROOT_DIR/config/git/gitconfig"; destination="$HOME/.gitconfig"; ready=1 ;;
-            plugin-list|plugins)
+            plugin-list|antidote)
+                if [[ -r "$data_dir/antidote/antidote.zsh" &&
+                      -r "$data_dir/antidote/functions/antidote-load" ]]; then ready=1; fi
                 if [[ "$pair" == plugin-list ]]; then
                     source="$ROOT_DIR/config/zsh/zsh_plugins.txt"
-                    destination="$XDG_CONFIG_HOME/oh-my-devboom/zsh_plugins.txt"
+                    destination="${ZDOTDIR:-$HOME}/.zsh_plugins.txt"
+                    # 清单交由用户维护，backup 也不替换已有内容。
+                    if [[ ! -e "$destination" && ! -L "$destination" ]]; then
+                        if [[ -e "$legacy_plugins" || -L "$legacy_plugins" ]]; then source=$legacy_plugins; fi
+                    else
+                        ready=0
+                    fi
                 fi
-                if [[ -r "$XDG_CACHE_HOME/oh-my-devboom/zsh_plugins.zsh" ]]; then ready=1; fi
                 ;;
             powerlevel10k-preset|powerlevel10k-instant|powerlevel10k)
                 if [[ "$pair" == powerlevel10k-preset ]]; then
@@ -49,6 +57,7 @@ module_dotfiles() {
         if [[ "$ready" == 0 ]] && ! { [[ -L "$destination" ]] && [[ -f "$destination" ]]; }; then continue; fi
         result=0
         deploy_config "$source" "$destination" || result=$?
+        if [[ "$pair" == plugin-list && "$result" == 0 ]]; then touch "$destination" || result=1; fi
         if [[ "$result" == 1 ]]; then
             status=1
         elif [[ "$result" == 2 && "$status" == 0 ]]; then

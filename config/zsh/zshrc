@@ -31,10 +31,10 @@ for _devboom_module in homebrew clash eza bat fd zellij; do
     fi
 done
 
-# Antidote 在补全路径准备好后调用此函数，先初始化 widgets 再加载后续插件。
+# Antidote 在补全路径准备好后调用此函数；保留钩子供原生重新加载使用。
 typeset -g _devboom_shell_initialized=0
 _devboom_init_completion() {
-    local module
+    local module _devboom_zsh_dir="$XDG_CONFIG_HOME/oh-my-devboom/zsh"
     # 保留 use-omz 的包装器，由它重放 Git 插件排队的补全定义。
     (( $+functions[compinit] )) || autoload -Uz compinit
     compinit -i -d "$XDG_CACHE_HOME/oh-my-devboom/zcompdump"
@@ -47,13 +47,12 @@ _devboom_init_completion() {
     _devboom_shell_initialized=1
 }
 
-if [[ -r "$_devboom_zsh_dir/plugins.zsh" ]]; then
-    source "$_devboom_zsh_dir/plugins.zsh"
+if [[ -r "$_devboom_zsh_dir/antidote.zsh" ]]; then
+    source "$_devboom_zsh_dir/antidote.zsh"
 fi
 # 未安装插件或移除补全插件时，仍初始化基础补全和工具。
 (( _devboom_shell_initialized )) || _devboom_init_completion
 unset _devboom_shell_initialized
-unfunction _devboom_init_completion
 
 if [[ -r "$_devboom_zsh_dir/powerlevel10k.zsh" ]]; then
     source "$_devboom_zsh_dir/powerlevel10k.zsh"

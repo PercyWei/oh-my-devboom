@@ -99,13 +99,13 @@ RELEASE
         output=$("$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --help)
         [[ "$output" == *--config* && "$output" == *--modules* && "$output" == *--allow-remote* ]] || fail 'Help documents config, module and remote options'
         output=$("$BASH_BIN" "$REPO_ROOT/bootstrap.sh" --list-modules)
-        for module in clash base homebrew zsh_plugins powerlevel10k tools dotfiles shell; do
+        for module in clash base homebrew antidote powerlevel10k tools dotfiles shell; do
             [[ "$output" == *"$module"* ]] || fail "Missing module in list: $module"
         done
         [[ "$output" != *starship* ]] || fail 'Removed Starship module is still listed'
         source "$REPO_ROOT/bootstrap.sh"
         parse_args --non-interactive
-        assert_equal 'clash base homebrew zsh_plugins powerlevel10k tools dotfiles shell' "$MODULES" 'Default config enables Clash first and login shell setup last'
+        assert_equal 'clash base homebrew antidote powerlevel10k tools dotfiles shell' "$MODULES" 'Default config enables Clash first and login shell setup last'
         assert_equal 'uv fzf rg bat eza zoxide nvtop jq fd gh zellij modelscope-hub huggingface-hub' "$TOOLS" 'Default tools install uv before its dependent tools'
         assert_equal 'https://ghfast.top/' "$GITHUB_PROXY" 'Default config selects the GitHub download prefix'
         assert_equal 600 "$GIT_TIMEOUT" 'Default Git download timeout is ten minutes'
@@ -661,8 +661,17 @@ FIXTURE
             printf 'SKIP: shell integration checks require zsh\n'
             exit 0
         fi
-        mkdir -p "$TEST_ROOT/fzf" "$XDG_CACHE_HOME/oh-my-devboom" "$XDG_CONFIG_HOME/oh-my-devboom/zsh"
-        for fragment in fzf zoxide plugins; do
+        mkdir -p "$TEST_ROOT/fzf" "$XDG_CACHE_HOME/oh-my-devboom" "$XDG_CONFIG_HOME/oh-my-devboom/zsh" \
+            "$XDG_DATA_HOME/oh-my-devboom/antidote"
+        cat > "$XDG_DATA_HOME/oh-my-devboom/antidote/antidote.zsh" <<'ZSH'
+antidote() {
+    [[ $1 == load ]] || return 1
+    if [[ -r "$XDG_CACHE_HOME/oh-my-devboom/plugins.zsh" ]]; then
+        source "$XDG_CACHE_HOME/oh-my-devboom/plugins.zsh"
+    fi
+}
+ZSH
+        for fragment in fzf zoxide antidote; do
             cp "$REPO_ROOT/config/zsh/modules/$fragment.zsh" "$XDG_CONFIG_HOME/oh-my-devboom/zsh/"
         done
         # Executables satisfy command detection; startup must not execute fzf.
@@ -713,7 +722,7 @@ if [[ $scenario != missing_scripts ]]; then
 else
     [[ $fzf_init_calls == 0 ]]
 fi
-[[ $+functions[_devboom_init_completion] == 0 ]]
+[[ $+functions[_devboom_init_completion] == 1 ]]
 ZSH
         cp "$REPO_ROOT/config/zsh/zshrc" "$TEST_ROOT/zshrc"
         fzf_dir="$XDG_DATA_HOME/oh-my-devboom/fzf"
@@ -731,7 +740,7 @@ ZSH
                     ;;
             esac
             if [[ "$scenario" == bundle ]]; then
-                cat > "$XDG_CACHE_HOME/oh-my-devboom/zsh_plugins.zsh" <<'ZSH'
+                cat > "$XDG_CACHE_HOME/oh-my-devboom/plugins.zsh" <<'ZSH'
 _devboom_init_completion
 # Later plugins must see the widgets already initialized.
 [[ $+functions[z] == 1 && $fzf_init_calls == 1 ]] || exit 1
