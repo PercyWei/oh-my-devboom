@@ -2,7 +2,7 @@
 
 轻量、模块化的个人开发环境初始化工具，适用于 Linux 服务器、Docker 容器和 macOS。
 
-使用 Bash 编写，不依赖 Python 或 Node.js。支持按需安装、重复执行和配置备份，已有工具按规则复用，配置以普通文件部署。
+使用 Bash 编写，无需预装 Python 或 Node.js。支持按需安装、重复执行和配置备份，已有工具按规则复用，配置以普通文件部署。
 
 ## 快速开始
 
@@ -59,12 +59,18 @@ bash bootstrap.sh --config config/local.conf
 | jq | JSON 筛选、转换与格式化 |
 | fd | 按文件名、扩展名和类型查找文件 |
 | GitHub CLI（`gh`） | 管理 GitHub 仓库、Issue 和 Pull Request |
+| [ModelScope Hub](https://github.com/modelscope/modelscope_hub)（`modelscope-hub`） | 使用 `ms-hub` 下载、上传和管理模型及数据集 |
+| [Hugging Face Hub](https://huggingface.co/docs/huggingface_hub/guides/cli)（`huggingface-hub`） | 使用 `hf` 管理 Hugging Face 模型、数据集和仓库 |
 
 Linux 使用 `apt-get`、`dnf`、`yum`、`pacman`、`zypper` 或 `apk`，macOS 使用 Homebrew。root 跳过 Homebrew；Linux 容器不新装 Homebrew。系统包安装需要 root 或 sudo，权限不足或包不可用时会提示。
 
 NVTOP 需要 GPU 驱动及设备访问权限，容器需暴露 GPU；macOS 仅支持 Apple GPU。Debian/Ubuntu 的 `batcat`、`fdfind` 会按需配置为 `bat`、`fd` 别名。
 
 `gh` 通过现有软件源安装，使用前运行 `gh auth login` 登录 GitHub；升级可参考[官方安装说明](https://github.com/cli/cli/blob/trunk/docs/install_linux.md)。
+
+两个 Hub 工具通过 `uv tool install` 安装到隔离环境，命令放在 `~/.local/bin`；选择任一项会先安装或复用 uv。优先使用已有的 Python ≥3.10，缺失时由 uv 下载。项目中的 Python 代码仍需在自己的环境中声明和安装依赖。
+
+按需使用 `ms-hub login`、`hf auth login` 登录；升级运行 `uv tool upgrade modelscope-hub huggingface-hub`。
 
 ## 按需安装
 
@@ -92,6 +98,9 @@ bash bootstrap.sh --non-interactive --modules tools --tools jq,fd
 
 # 仅安装 GitHub CLI
 bash bootstrap.sh --non-interactive --modules tools --tools gh
+
+# 使用 uv 安装两个 Hub 工具；首次安装 uv 时需下载授权
+bash bootstrap.sh --non-interactive --modules tools --tools modelscope-hub,huggingface-hub --allow-remote
 
 # 选择全部模块和工具；Linux 仍需配置 Clash YAML
 bash bootstrap.sh --config config/local.conf --modules all --tools all
@@ -179,6 +188,8 @@ clashctl status
 ```
 
 Clash 尚未启用时，GitHub 下载默认使用第三方加速前缀 `https://ghfast.top/`，可通过 `[options] github_proxy` 修改或置空直连。该前缀覆盖本项目直接发起的 GitHub 文件下载和 Git 请求（Git 加速需 Git 2.31+），不覆盖包管理器或上游安装器内部的下载。
+
+uv 安装 Hub 工具需要访问 PyPI，缺少合适的 Python 时还需访问 GitHub；`github_proxy` 不改写 uv 内部的下载请求。
 
 安装前会显示上游来源，源码固定提交与发布包校验见相应[安装模块](modules/)。Homebrew、uv 安装脚本随上游更新。
 

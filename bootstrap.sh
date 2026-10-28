@@ -17,7 +17,8 @@ Set up a personal development environment on Linux or macOS (Bash 3.2+).
   --config FILE     Installation settings (default: config/default.conf)
   --modules LIST    Override modules: clash,base,homebrew,zsh,powerlevel10k,tools,dotfiles,shell
                     Comma-separated names, or all.
-  --tools LIST      Override tools: uv,fzf,rg,bat,eza,zoxide,zellij,nvtop,jq,fd,gh
+  --tools LIST      Override tools: uv,fzf,rg,bat,eza,zoxide,zellij,nvtop,jq,fd,gh,
+                    modelscope-hub,huggingface-hub (automatically include uv).
                     Comma-separated names, or all. Requires the tools module.
   --non-interactive Run without prompts; required when stdin is not a terminal
   --allow-remote    Authorize direct upstream downloads and execution:
@@ -73,7 +74,7 @@ parse_args() {
                         if [[ "$1" == --modules ]]; then choices=$AVAILABLE_MODULES; else choices=$AVAILABLE_TOOLS; fi
                         [[ "$values" != all ]] || values=${choices// /,}
                         case "$values" in
-                            ,*|*,|*,,*|*[!a-z0-9,]*) log_error "Invalid list: $values"; return 1 ;;
+                            ,*|*,|*,,*|*[!a-z0-9,-]*) log_error "Invalid list: $values"; return 1 ;;
                         esac
                         local selected=''
                         for item in ${values//,/ }; do
@@ -104,6 +105,15 @@ parse_args() {
     [[ -z "$tools_override" ]] || TOOLS=$tools_override
     [[ -z "$conflict_override" ]] || CONFLICT_POLICY=$conflict_override
     [[ "$remote_override" == 0 ]] || ALLOW_REMOTE=1
+    case " $TOOLS " in
+        *' modelscope-hub '*|*' huggingface-hub '*)
+            local ordered_tools=uv tool
+            for tool in $TOOLS; do
+                [[ "$tool" == uv ]] || ordered_tools="$ordered_tools $tool"
+            done
+            TOOLS=$ordered_tools
+            ;;
+    esac
     return 0
 }
 
@@ -127,6 +137,13 @@ print_install_plan() {
         esac
     done
     case " $MODULES " in *' tools '*) ;; *) log_info '可选开发工具：未启用 tools 模块。' ;; esac
+    if [[ " $MODULES " == *' tools '* ]]; then
+        case " $TOOLS " in
+            *' modelscope-hub '*|*' huggingface-hub '*)
+                log_info 'Hub 工具使用 uv 隔离安装；复用 Python >=3.10，缺失时由 uv 下载。'
+                ;;
+        esac
+    fi
     printf '\n配置冲突策略：%s' "$CONFLICT_POLICY"
     case "$CONFLICT_POLICY" in
         skip) printf '（保留已有文件）\n' ;;

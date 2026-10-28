@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 AVAILABLE_MODULES='clash base homebrew zsh powerlevel10k tools dotfiles shell'
-AVAILABLE_TOOLS='uv fzf rg bat eza zoxide zellij nvtop jq fd gh'
+AVAILABLE_TOOLS='uv fzf rg bat eza zoxide zellij nvtop jq fd gh modelscope-hub huggingface-hub'
 
 load_install_config() {
     local file=$1 line section='' key value line_number=0 seen=' '
@@ -41,7 +41,7 @@ load_install_config() {
         value=${value#"${value%%[![:space:]]*}"}
         value=${value%"${value##*[![:space:]]}"}
         case "$key" in
-            ''|*[!a-z0-9_]*) log_error "$file:$line_number: Invalid key: $key"; return 1 ;;
+            ''|*[!a-z0-9_-]*) log_error "$file:$line_number: Invalid key: $key"; return 1 ;;
         esac
         case "$section" in
             modules)

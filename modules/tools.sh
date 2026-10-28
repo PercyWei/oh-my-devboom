@@ -200,12 +200,14 @@ module_tools() {
     fi
     for tool in $TOOLS; do
         result=0
-        if have "$tool" || { [[ "$tool" == bat ]] && have batcat; } ||
-            { [[ "$tool" == fd ]] && have fdfind; }; then
-            command_name=$tool
-            if ! have "$tool"; then
-                case "$tool" in bat) command_name=batcat ;; fd) command_name=fdfind ;; esac
-            fi
+        command_name=$tool
+        case "$tool" in
+            modelscope-hub) command_name=ms-hub ;;
+            huggingface-hub) command_name=hf ;;
+            bat) if ! have bat && have batcat; then command_name=batcat; fi ;;
+            fd) if ! have fd && have fdfind; then command_name=fdfind; fi ;;
+        esac
+        if have "$command_name"; then
             record_result ready "$tool" "复用现有命令 ${command_name}。"
         elif [[ "$tool" == uv ]]; then
             if have brew && [[ "$USER_ID" != 0 ]]; then
@@ -223,6 +225,22 @@ module_tools() {
                         result=1
                     fi
                 fi
+            fi
+        elif [[ "$tool" == modelscope-hub || "$tool" == huggingface-hub ]]; then
+            if ! have uv; then
+                record_result skipped "$tool" '缺少 uv，未安装。' '先完成 uv 安装后重试 tools 模块。'
+                result=2
+            elif UV_TOOL_BIN_DIR="$HOME/.local/bin" uv tool install --python '>=3.10' "$tool"; then
+                if have "$command_name"; then
+                    record_result installed "$tool" "已通过 uv 隔离安装，命令路径：$(command -v "$command_name")"
+                else
+                    record_result failed "$tool" "uv 安装已退出，但未找到命令 ${command_name}；预期目录：$HOME/.local/bin" \
+                        '检查 uv 输出和命令安装目录后重试。'
+                    result=1
+                fi
+            else
+                record_result failed "$tool" 'uv 安装失败。' '检查上方 uv 错误、网络和现有命令冲突后重试。'
+                result=1
             fi
         elif [[ "$tool" == zellij ]]; then
             install_zellij || result=$?
