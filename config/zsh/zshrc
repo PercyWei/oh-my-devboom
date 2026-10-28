@@ -25,7 +25,7 @@ alias ll='ls -lh'
 alias la='ls -lah'
 PROMPT='%n@%m:%~%# '
 
-for _devboom_module in homebrew clash eza bat fd zellij; do
+for _devboom_module in homebrew clash eza bat fd zellij huggingface-hub; do
     if [[ -r "$_devboom_zsh_dir/$_devboom_module.zsh" ]]; then
         source "$_devboom_zsh_dir/$_devboom_module.zsh"
     fi

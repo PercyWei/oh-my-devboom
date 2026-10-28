@@ -122,7 +122,7 @@ bash bootstrap.sh --list-modules
 
 ## 配置管理
 
-配置复制到用户目录，安装后不依赖仓库位置，可直接编辑目标文件。`XDG_CONFIG_HOME` 默认是 `~/.config`；设置 `ZDOTDIR` 时，`.zshrc`、`.p10k.zsh` 和 `.zsh_plugins.txt` 跟随该目录。
+配置复制到用户目录，安装后不依赖仓库位置，可直接编辑目标文件。`XDG_CONFIG_HOME`、`XDG_DATA_HOME`、`XDG_CACHE_HOME` 默认分别是 `~/.config`、`~/.local/share`、`~/.cache`；设置 `ZDOTDIR` 时，`.zshrc`、`.p10k.zsh` 和 `.zsh_plugins.txt` 跟随该目录。
 
 | 配置 | 默认目标 |
 | --- | --- |
@@ -132,11 +132,15 @@ bash bootstrap.sh --list-modules
 | Git 通用配置 | `~/.gitconfig` |
 | Powerlevel10k 个人覆盖配置 | `~/.p10k.zsh` |
 
+本项目管理的长期程序和数据包括 `XDG_DATA_HOME` 下 `oh-my-devboom/` 中的 Antidote、插件、Powerlevel10k、gitstatusd、fzf 集成脚本和 Shell 历史，以及 `clashctl/` 中的代理程序与配置。
+
 基础配置始终部署；可选片段在部署阶段确认命令和安装文件就绪，支持接入已有工具。插件配置需 Antidote 就绪，主题覆盖配置需 Powerlevel10k 和 gitstatusd 就绪。`dotfiles` 不自动删除已有片段；卸载工具后需自行删除用户目录中的对应片段。
 
 基础 `.zshrc` 保留环境、历史记录、补全和固定加载顺序，仅加载存在的片段。工具配置位于 [config/zsh/modules/](config/zsh/modules/)，片段只保留可选文件、缓存和实际功能分支的判断。安装新工具后重跑 `dotfiles` 接入。
 
 Powerlevel10k 先加载固定版本主题自带的 lean 模板，再加载 `~/.p10k.zsh` 并刷新提示符。仓库只维护个人差异，可直接编辑该文件；升级主题时需核对覆盖项。`p10k configure` 会将完整配置写入同一用户文件，主题目录中的模板保持不变。
+
+`gitstatusd` 安装在 `${XDG_DATA_HOME:-$HOME/.local/share}/oh-my-devboom/gitstatus/`。Zsh 通过上游变量 `GITSTATUS_CACHE_DIR` 指向该数据目录，并设置 `GITSTATUS_AUTO_INSTALL=0`，由 bootstrap 负责安装。
 
 bootstrap 安装 Antidote、初始化清单并预下载插件。之后由 Antidote 原生机制管理：编辑 `${ZDOTDIR:-$HOME}/.zsh_plugins.txt` 后运行 `exec zsh`，`antidote load` 会自动重建静态加载脚本，无需重跑 bootstrap。脚本位于 `~/.cache/oh-my-devboom/plugins.zsh`，插件存放在 `~/.local/share/oh-my-devboom/plugins/`。
 
@@ -150,6 +154,17 @@ exec zsh
 默认清单用 `pin` 锁定提交，更新命令会跳过这些插件；修改或移除对应 `pin` 后重启 Zsh，再按需更新。
 
 Antidote 通过 `use-omz` 加载 Oh My Zsh Git 插件及必要依赖，提供 `gst`（`git status`）、`gp`（`git push`）、`ga`（`git add`）等别名。Zellij 就绪时部署独立片段，使用 `zj` 启动。
+
+检测到 `hf` 时，`dotfiles` 部署 `huggingface-hub.zsh`，通过 `HF_TOKEN_PATH` 将活跃 token 默认保存在 `$XDG_DATA_HOME/huggingface/token`；已保存的 token 列表 `stored_tokens` 位于同一目录。显式设置的 `HF_TOKEN_PATH` 优先，其次沿用显式 `HF_HOME` 下的认证路径；模型、Xet 和其他下载缓存位置保持上游配置。该环境变量对加载片段后启动的 CLI 和 Python 进程生效，详见 [Hugging Face 环境变量说明](https://huggingface.co/docs/huggingface_hub/package_reference/environment_variables)及[认证文件路径定义](https://github.com/huggingface/huggingface_hub/blob/main/src/huggingface_hub/constants.py)。ModelScope 登录凭据默认位于 `~/.modelscope/credentials/`，与模型缓存分开，见[官方配置说明](https://github.com/modelscope/modelscope_hub#configuration)。
+
+本项目放在 `XDG_CACHE_HOME` 下的补全缓存 `oh-my-devboom/zcompdump`、插件加载脚本 `oh-my-devboom/plugins.zsh` 和即时提示缓存 `p10k-instant-prompt-*.zsh` 可在后续 Zsh 启动时重建。`oh-my-devboom/installer.*` 是供检查的安装脚本副本；Clash、Zellij 的下载与解压目录及代理环境交接文件只在安装期间使用，完成后可清理残留。这些文件不应在安装进行中删除。
+
+Zellij 保留上游存储行为。其[会话恢复数据](https://zellij.dev/documentation/session-resurrection.html)用于恢复已退出的会话，清理系统缓存时应保留。v0.45.1 的默认位置为：
+
+- Linux：`${XDG_CACHE_HOME:-$HOME/.cache}/zellij/contract_version_1/session_info/`。
+- macOS：`~/Library/Caches/org.Zellij-Contributors.Zellij/contract_version_1/session_info/`。
+
+路径定义见[固定版本源码](https://github.com/zellij-org/zellij/blob/v0.45.1/zellij-utils/src/consts.rs)。Zellij 的系统缓存目录还保存插件授权记录 `permissions.kdl`，删除后需重新授权。上述可重建缓存的说明仅适用于本项目列出的文件。
 
 部署规则：
 
@@ -186,6 +201,29 @@ exec zsh
 git config --file "$HOME/.gitconfig.local" user.name "Your Name"
 git config --file "$HOME/.gitconfig.local" user.email "you@example.com"
 ```
+
+### gitstatusd 目录迁移
+
+已有环境若将 `gitstatusd` 安装在 `XDG_CACHE_HOME` 下，可在仓库目录执行以下命令，将程序安装到数据目录并更新 Zsh 加载配置：
+
+```bash
+bash bootstrap.sh --non-interactive --modules powerlevel10k,dotfiles --allow-remote --conflict backup
+exec zsh
+```
+
+此命令会备份并更新 `dotfiles` 管理的所有冲突配置，个人修改可从备份恢复。确认新配置正常后，可自行删除旧的 `${XDG_CACHE_HOME:-$HOME/.cache}/oh-my-devboom/gitstatus/` 目录。
+
+### Hugging Face 认证目录迁移
+
+已有环境先确认 `hf` 可用，再在仓库目录更新配置：
+
+```bash
+bash bootstrap.sh --non-interactive --modules dotfiles --conflict backup
+exec zsh
+hf auth login
+```
+
+此命令会备份并更新 `dotfiles` 管理的所有冲突配置。加载新配置后重新登录即可在新位置保存凭据；需要保留多个已保存凭据时，可将旧认证目录中的 `token`、`stored_tokens` 一起迁移到新目录，保留原文件权限。项目不会自动迁移认证文件；确认认证正常后再清理旧副本。
 
 ## 网络与代理
 

@@ -3,7 +3,7 @@
 module_powerlevel10k() {
     local theme_dir="$XDG_DATA_HOME/oh-my-devboom/powerlevel10k"
     local theme_commit=d05a1b00f9a61f9578bf9dc19b8451942dde8734
-    local cache="$XDG_CACHE_HOME/oh-my-devboom/gitstatus"
+    local daemon_dir="$XDG_DATA_HOME/oh-my-devboom/gitstatus"
     local platform sha256 daemon daemon_url staging checksum result=0 RECORD_PACKAGE_RESULTS=0
 
     ensure_packages zsh git || return $?
@@ -44,15 +44,15 @@ module_powerlevel10k() {
     esac
     daemon=gitstatusd-$platform
     daemon_url="https://github.com/romkatv/gitstatus/releases/download/v1.5.4/$daemon.tar.gz"
-    if [[ -d "$theme_dir" && -x "$cache/$daemon" ]]; then
-        record_result ready gitstatusd "缓存已就绪：$cache/$daemon"
+    if [[ -d "$theme_dir" && -x "$daemon_dir/$daemon" ]]; then
+        record_result ready gitstatusd "程序已就绪：$daemon_dir/$daemon"
         return 0
     fi
-    if [[ -e "$cache/$daemon" || -L "$cache/$daemon" ]] && [[ ! -x "$cache/$daemon" ]]; then
-        record_result skipped gitstatusd "现有缓存不可执行，已保留：$cache/$daemon" '检查缓存文件来源与执行权限后重试。'
+    if [[ -e "$daemon_dir/$daemon" || -L "$daemon_dir/$daemon" ]] && [[ ! -x "$daemon_dir/$daemon" ]]; then
+        record_result skipped gitstatusd "现有文件不可执行，已保留：$daemon_dir/$daemon" '检查文件来源与执行权限后重试。'
         return 2
     fi
-    if [[ ! -x "$cache/$daemon" ]]; then
+    if [[ ! -x "$daemon_dir/$daemon" ]]; then
         ensure_packages tar || return $?
         if ! have sha256sum && ! have shasum; then
             record_result skipped gitstatusd '缺少 SHA-256 校验工具，尚未下载发布包。' '安装 sha256sum 或 shasum 后重试。'
@@ -61,8 +61,8 @@ module_powerlevel10k() {
     fi
     approve_remote 'Powerlevel10k 与 gitstatusd' \
         "https://github.com/romkatv/powerlevel10k/tree/${theme_commit}；$daemon_url" || return $?
-    mkdir -p "$XDG_DATA_HOME/oh-my-devboom" "$cache" || {
-        record_result failed Powerlevel10k "无法创建安装或缓存目录：$XDG_DATA_HOME/oh-my-devboom、$cache" '检查目录权限和可用磁盘空间。'
+    mkdir -p "$XDG_DATA_HOME/oh-my-devboom" "$daemon_dir" || {
+        record_result failed Powerlevel10k "无法创建安装目录：$XDG_DATA_HOME/oh-my-devboom、$daemon_dir" '检查目录权限和可用磁盘空间。'
         return 1
     }
     if [[ ! -d "$theme_dir" ]]; then
@@ -85,9 +85,9 @@ module_powerlevel10k() {
         }
         record_result installed Powerlevel10k "固定提交 ${theme_commit:0:7}；$theme_dir"
     fi
-    if [[ ! -x "$cache/$daemon" ]]; then
-        staging="$(mktemp -d "$cache/install.XXXXXX")" || {
-            record_result failed gitstatusd "无法在 $cache 创建临时目录。" '检查缓存目录权限和可用磁盘空间。'
+    if [[ ! -x "$daemon_dir/$daemon" ]]; then
+        staging="$(mktemp -d "$daemon_dir/install.XXXXXX")" || {
+            record_result failed gitstatusd "无法在 $daemon_dir 创建临时目录。" '检查安装目录权限和可用磁盘空间。'
             return 1
         }
         result=0
@@ -113,15 +113,15 @@ module_powerlevel10k() {
         fi
         if ! tar -xzf "$staging/archive.tar.gz" -C "$staging" "$daemon" ||
             ! chmod +x "$staging/$daemon" ||
-            ! mv -- "$staging/$daemon" "$cache/$daemon"; then
+            ! mv -- "$staging/$daemon" "$daemon_dir/$daemon"; then
             rm -rf -- "$staging"
-            record_result failed gitstatusd "解压、设置执行权限或部署失败；目标：$cache/$daemon" '检查上方命令错误、缓存目录权限和可用磁盘空间。'
+            record_result failed gitstatusd "解压、设置执行权限或部署失败；目标：$daemon_dir/$daemon" '检查上方命令错误、安装目录权限和可用磁盘空间。'
             return 1
         fi
         rm -rf -- "$staging"
-        record_result installed gitstatusd "v1.5.4，SHA-256 校验通过；$cache/$daemon"
+        record_result installed gitstatusd "v1.5.4，SHA-256 校验通过；$daemon_dir/$daemon"
     else
-        record_result ready gitstatusd "缓存已就绪：$cache/$daemon"
+        record_result ready gitstatusd "程序已就绪：$daemon_dir/$daemon"
     fi
     log_info 'Powerlevel10k 与 gitstatusd 已就绪；dotfiles 模块部署个人覆盖配置。'
 }

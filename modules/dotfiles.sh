@@ -9,7 +9,7 @@ module_dotfiles() {
         daemon_os=darwin
         [[ "$ARCH" != aarch64 ]] || daemon_arch=arm64
     fi
-    for pair in zshrc git plugin-list powerlevel10k-preset homebrew clash eza bat fd zellij fzf zoxide antidote powerlevel10k-instant powerlevel10k; do
+    for pair in zshrc git plugin-list powerlevel10k-preset homebrew clash eza bat fd zellij huggingface-hub fzf zoxide antidote powerlevel10k-instant powerlevel10k; do
         source="$ROOT_DIR/config/zsh/modules/$pair.zsh"
         destination="$config_dir/$pair.zsh"
         ready=0
@@ -34,7 +34,7 @@ module_dotfiles() {
                 fi
                 if [[ -r "$data_dir/powerlevel10k/powerlevel10k.zsh-theme" &&
                       -r "$data_dir/powerlevel10k/config/p10k-lean.zsh" &&
-                      -x "$XDG_CACHE_HOME/oh-my-devboom/gitstatus/gitstatusd-$daemon_os-$daemon_arch" ]]; then ready=1; fi
+                      -x "$data_dir/gitstatus/gitstatusd-$daemon_os-$daemon_arch" ]]; then ready=1; fi
                 ;;
             homebrew)
                 if [[ "$USER_ID" != 0 ]] && have brew; then ready=1; fi ;;
@@ -44,6 +44,7 @@ module_dotfiles() {
                       "$(cat "$XDG_DATA_HOME/clashctl/.clashctl-format")" == 1 ]]; then ready=1; fi
                 ;;
             eza|zoxide|zellij) if have "$pair"; then ready=1; fi ;;
+            huggingface-hub) if have hf; then ready=1; fi ;;
             bat) if ! have bat && have batcat; then ready=1; fi ;;
             fd) if ! have fd && have fdfind; then ready=1; fi ;;
             fzf) if have fzf && [[ -r "$data_dir/fzf/init.zsh" ]]; then ready=1; fi ;;
