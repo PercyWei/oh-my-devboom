@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 AVAILABLE_MODULES='clash base homebrew antidote powerlevel10k tools dotfiles shell'
-AVAILABLE_TOOLS='uv fzf rg bat eza zoxide zellij nvtop jq fd gh modelscope-hub huggingface-hub'
+AVAILABLE_TOOLS='uv fzf rg bat eza tree zoxide zellij nvtop jq fd gh modelscope-hub huggingface-hub'
 AVAILABLE_DOTFILES='zshrc git homebrew clash eza bat fd zellij huggingface-hub fzf zoxide antidote powerlevel10k'
 
 load_install_config() {

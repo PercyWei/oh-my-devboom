@@ -67,6 +67,7 @@ exec zsh
 | `rg` | `rg` | ripgrep 内容搜索 |
 | `bat` | `bat` | 文件预览与语法高亮 |
 | `eza` | `eza`、`ll`、`la` | 增强文件列表 |
+| `tree` | `tree` | 树状显示目录结构 |
 | `zoxide` | `zoxide`、`z`、`zi` | 按使用记录跳转目录 |
 | `zellij` | `zellij`、`zj` | 终端分屏、标签页与持久会话 |
 | `nvtop` | `nvtop` | GPU 监控，需驱动和设备访问权限 |

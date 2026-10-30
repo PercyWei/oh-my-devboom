@@ -17,7 +17,7 @@ Set up a personal development environment on Linux or macOS (Bash 3.2+).
   --config FILE     Installation settings (default: config/default.conf)
   --modules LIST    Override modules: clash,base,homebrew,antidote,powerlevel10k,tools,dotfiles,shell
                     Comma-separated names, or all.
-  --tools LIST      Override tools: uv,fzf,rg,bat,eza,zoxide,zellij,nvtop,jq,fd,gh,
+  --tools LIST      Override tools: uv,fzf,rg,bat,eza,tree,zoxide,zellij,nvtop,jq,fd,gh,
                     modelscope-hub,huggingface-hub (automatically include uv).
                     Comma-separated names, or all. Requires the tools module.
   --dotfiles LIST   Select configuration components: zshrc,git,homebrew,clash,eza,

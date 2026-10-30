@@ -106,7 +106,7 @@ RELEASE
         source "$REPO_ROOT/bootstrap.sh"
         parse_args --non-interactive
         assert_equal 'clash base homebrew antidote powerlevel10k tools dotfiles shell' "$MODULES" 'Default config enables Clash first and login shell setup last'
-        assert_equal 'uv fzf rg bat eza zoxide nvtop jq fd gh zellij modelscope-hub huggingface-hub' "$TOOLS" 'Default tools install uv before its dependent tools'
+        assert_equal 'uv fzf rg bat eza tree zoxide nvtop jq fd gh zellij modelscope-hub huggingface-hub' "$TOOLS" 'Default tools install uv before its dependent tools'
         assert_equal 'https://ghfast.top/' "$GITHUB_PROXY" 'Default config selects the GitHub download prefix'
         assert_equal 600 "$GIT_TIMEOUT" 'Default Git download timeout is ten minutes'
         assert_equal '' "$CLASH_CONFIG_FILE" 'Default config requires a user-provided Clash YAML path'
